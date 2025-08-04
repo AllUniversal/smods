@@ -2684,7 +2684,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     for i = 2, 5 do
         SMODS.PokerHandPart {
             key = '_'..i,
-            func = function(hand) return get_X_same(i, hand, i >= 5) end
+            func = function(hand) return get_X_same(i, hand, true) end
         }
     end
 
