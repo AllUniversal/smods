@@ -2419,21 +2419,24 @@ function SMODS.localize_box(lines, args)
             end
             final_line[#final_line+1] = {n=G.UIT.C, config={align = "m", colour = part.control.B and args.vars.colours[tonumber(part.control.B)] or part.control.X and loc_colour(part.control.X) or nil, r = 0.05, padding = 0.03, res = 0.15}, nodes={}}
             final_line[#final_line].nodes[1] = {n=G.UIT.O, config={
-            object = DynaText({string = {assembled_string}, colours = {part.control.V and args.vars.colours[tonumber(part.control.V)] or loc_colour(part.control.C or nil)},
-                float = _float,
-                silent = _silent,
-                pop_in = _pop_in,
-                bump = _bump,
-                spacing = _spacing,
-                font = SMODS.Fonts[part.control.f] or (tonumber(part.control.f) and G.FONTS[tonumber(part.control.f)]),
-                scale = 0.32*(part.control.s and tonumber(part.control.s) or args.scale  or 1)*desc_scale})
-            }}
+                underline = part.control.u and loc_colour(part.control.u),
+                object = DynaText({string = {assembled_string}, colours = {part.control.V and args.vars.colours[tonumber(part.control.V)] or loc_colour(part.control.C or nil)},
+                    float = _float,
+                    silent = _silent,
+                    pop_in = _pop_in,
+                    bump = _bump,
+                    spacing = _spacing,
+                    font = SMODS.Fonts[part.control.f] or (tonumber(part.control.f) and G.FONTS[tonumber(part.control.f)]),
+                    scale = 0.32*(part.control.s and tonumber(part.control.s) or args.scale  or 1)*desc_scale})
+                }
+            }
         elseif part.control.X or part.control.B then
             final_line[#final_line+1] = {n=G.UIT.C, config={align = "m", colour = part.control.B and args.vars.colours[tonumber(part.control.B)] or loc_colour(part.control.X), r = 0.05, padding = 0.03, res = 0.15}, nodes={
                 {n=G.UIT.T, config={
                 text = assembled_string,
                 colour = part.control.V and args.vars.colours[tonumber(part.control.V)] or loc_colour(part.control.C or nil),
                 font = SMODS.Fonts[part.control.f] or (tonumber(part.control.f) and G.FONTS[tonumber(part.control.f)]),
+                underline = part.control.u and loc_colour(part.control.u),
                 scale = 0.32*(part.control.s and tonumber(part.control.s) or args.scale  or 1)*desc_scale}},
             }}
         else
@@ -2443,6 +2446,7 @@ function SMODS.localize_box(lines, args)
             shadow = args.shadow,
             colour = part.control.V and args.vars.colours[tonumber(part.control.V)] or not part.control.C and args.text_colour or loc_colour(part.control.C or nil, args.default_col),
             font = SMODS.Fonts[part.control.f] or (tonumber(part.control.f) and G.FONTS[tonumber(part.control.f)]),
+            underline = part.control.u and loc_colour(part.control.u),
             scale = 0.32*(part.control.s and tonumber(part.control.s) or args.scale  or 1)*desc_scale},}
         end
     end
@@ -2459,6 +2463,16 @@ function SMODS.get_multi_boxes(multi_box)
         end
     end
     return multi_boxes
+end
+
+function SMODS.info_queue_desc_from_rows(desc_nodes, empty, maxw)
+  local t = {}
+  for k, v in ipairs(desc_nodes) do
+    t[#t+1] = {n=G.UIT.R, config={align = "cm", maxw = maxw}, nodes=v}
+  end
+  return {n=G.UIT.R, config={align = "cm", colour = desc_nodes.background_colour or empty and G.C.CLEAR or G.C.UI.BACKGROUND_WHITE, r = 0.1, emboss = not empty and 0.05 or nil, filler = true, main_box_flag = desc_nodes.main_box_flag and true or nil}, nodes={
+    {n=G.UIT.R, config={align = "cm"}, nodes=t}
+  }}
 end
 
 function SMODS.destroy_cards(cards, bypass_eternal, immediate)
@@ -2654,7 +2668,7 @@ G.FUNCS.update_blind_debuff_text = function(e)
 end
 
 function Card:should_hide_front()
-  return self.ability.effect == 'Stone Card' or self.config.center.overrides_base_rank
+  return self.ability.effect == 'Stone Card' or self.config.center.replace_base_card
 end
 
 function SMODS.is_eternal(card, trigger)
@@ -2832,42 +2846,54 @@ function Card:calculate_joker(context, ...)
 end
 
 function SMODS.quip(quip_type)
-    if not (quip_type == 'win' or quip_type == 'loss') then return nil end
+    if not quip_type then return nil end
     local pool = {}
+    local total_weight = 0
     for k, v in pairs(SMODS.JimboQuips) do
         local add = true
-        local in_pool, pool_opts
+        local in_pool, pool_opts, deck_pool_opts, mod_pool_opts
         if v.filter and type(v.filter) == 'function' then
             in_pool, pool_opts = v:filter(quip_type)
         end
         local deck = G.P_CENTERS[G.GAME.selected_back.effect.center.key] or SMODS.Centers[G.GAME.selected_back.effect.center.key]
         if deck and deck.quip_filter and type(deck.quip_filter) == 'function' then
-            add = deck.quip_filter(v, quip_type)
+            add, deck_pool_opts = deck.quip_filter(v, quip_type)
+        end
+        for _, mod in ipairs(SMODS.mod_list) do
+            if mod.can_load and mod.quip_filter and type(mod.quip_filter) == "function" then
+                local mod_add
+                mod_add, mod_pool_opts = mod.quip_filter(v, quip_type)
+                add = add and mod_add
+            end
         end
         if v.filter and type(v.filter) == 'function' then
-            add = in_pool and (add or (pool_opts and pool_opts.override_base_checks))
+            add = in_pool and (add or (mod_pool_opts and mod_pool_opts.override_base_checks) or (deck_pool_opts and deck_pool_opts.override_base_checks) or (pool_opts and pool_opts.override_base_checks))
         end
-        if v.type ~= quip_type then
+        if v.type and v.type ~= quip_type then
             add = false
         end
         if add then
-            local rarity = (pool_opts and pool_opts.weight and math.max(1, math.floor(pool_opts.weight))) or 1
-            for i = 1, rarity do
-                pool[#pool+1] = v
+            local weight = (mod_pool_opts and mod_pool_opts.weight and math.max(1, math.floor(mod_pool_opts.weight))) or (deck_pool_opts and deck_pool_opts.weight and math.max(1, math.floor(deck_pool_opts.weight))) or (pool_opts and pool_opts.weight and math.max(1, math.floor(pool_opts.weight))) or 1
+            pool[#pool+1] = {quip = v, weight = weight}
+            total_weight = total_weight + weight
+        end
+    end
+    local quip_poll = pseudorandom(quip_type)
+    local it = 0
+    for _, v in ipairs(pool) do
+        it = it + v.weight
+        if it/total_weight >= quip_poll then
+            local args = {}
+            if v.quip.extra then
+                if type(v.quip.extra) == 'function' then
+                    args = v.quip.extra()
+                else
+                    args = v.quip.extra
+                end
             end
+            return v.quip.key, args
         end
     end
-    local quip = pseudorandom_element(pool, pseudoseed(quip_type))
-    local key = (quip and quip.key) or (quip_type == 'win' and 'wq_1' or 'lq_1')
-    local args = {}
-    if quip and quip.extra then
-        if type(quip.extra) == 'function' then
-            args = quip.extra()
-        else
-            args = quip.extra
-        end
-    end
-    return key, args
 end
 
 
