@@ -2964,3 +2964,11 @@ function ease_dollars(mod, instant)
         from_scoring = (G.STATE == G.STATES.HAND_PLAYED) or nil,
     })
 end
+
+function Card:is_rarity(rarity)
+    if self.ability.set ~= "Joker" then return false end
+    local rarities = {"Common", "Uncommon", "Rare", "Legendary"}
+    rarity = rarities[rarity] or rarity
+    local own_rarity = rarities[self.config.center.rarity] or self.config.center.rarity
+    return own_rarity == rarity or SMODS.Rarities[own_rarity] == rarity
+end
