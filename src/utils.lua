@@ -1859,10 +1859,29 @@ function SMODS.calculate_card_areas(_type, context, return_table, args)
     return flags
 end
 
+-- The context stack list, allows some advanced effects, like:
+-- Individual playing cards modifying probabilities checked during individual scoring, only when they're the context.other_card 
+-- (-> By checking the context in the stack PRIOR to the mod_probability context for the .individual / .other_card flags)
+SMODS.context_stack = {}
+
+function SMODS.push_to_context_stack(context)
+    if not context or type(context) ~= "table" then
+        sendWarnMessage(('Called SMODS.push_to_context_stack with invalid context \'%s\''):format(context), 'Util')
+    end
+    context = context or {}
+    SMODS.context_stack[#SMODS.context_stack+1] = context
+end
+
+function SMODS.pop_from_context_stack()
+    table.remove(SMODS.context_stack, #SMODS.context_stack)
+end
+
 -- Used to calculate contexts across G.jokers, scoring_hand (if present), G.play and G.GAME.selected_back
 -- Hook this function to add different areas to MOST calculations
 function SMODS.calculate_context(context, return_table, no_resolve)
     if G.STAGE ~= G.STAGES.RUN then return end
+
+    SMODS.push_to_context_stack(context)
 
     local has_area = context.cardarea and true or nil
     if no_resolve then SMODS.no_resolve = true end
@@ -1877,6 +1896,8 @@ function SMODS.calculate_context(context, return_table, no_resolve)
     context.main_eval = nil
     
     if SMODS.no_resolve then SMODS.no_resolve = nil end
+    
+    SMODS.pop_from_context_stack()
     
     if not return_table then
         local ret = {}
@@ -2131,6 +2152,7 @@ function Blind:calculate(context)
 end
 
 function SMODS.eval_individual(individual, context)
+    SMODS.push_to_context_stack(context)
     local ret = {}
     local post_trig = {}
 
@@ -2151,6 +2173,7 @@ function SMODS.eval_individual(individual, context)
             SMODS.calculate_context({blueprint_card = context.blueprint_card, post_trigger = true, other_card = individual.object, other_context = context, other_ret = ret}, post_trig)
         end
     end
+    SMODS.pop_from_context_stack()
     return ret, post_trig
 end
 
