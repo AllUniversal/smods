@@ -101,8 +101,8 @@
 ---@field old_suit? Suits|string Old suit the card changed from.
 ---@field round_eval? true Check if `true` for effects during round evaluation (cashout screen).
 ---@field get_ranks? true Check if `true` for modifying the rank(s) of the context.other_card. 
----@field eval_getting_ranks? table Passed as [source_context] param by hand type evaluation when calling get_ranks(). (Allows quantum ranks exclusively during / outside hand type evaluation)
----@field is_face_getting_ranks? table Passed as [source_context] param by Card:is_face() when calling get_ranks(). (Allows quantum ranks exclusively during / outside is_face() evaluation)
+---@field eval_getting_ranks? table Passed as flag in context.get_ranks by hand type evaluation when calling get_ranks(). (Allows quantum ranks exclusively during / outside hand type evaluation)
+---@field is_face_getting_ranks? table Passed as flag in context.get_ranks by Card:is_face() when calling get_ranks(). (Allows quantum ranks exclusively during / outside is_face() evaluation)
 ---@field no_mod? boolean Check if `true` to decide whether an effect should modify context.get_ranks' ranks field. (If you want to override and block other effects, return `no_mod=true` alongside ranks=[only your ranks])
 ---@field money_altered? true Check if `true` for effects when the amount of money the player has changes.
 ---@field from_shop? true Check if `true` if money changed during the shop.
@@ -654,7 +654,6 @@ function SMODS.merge_effects(...) end
 ---@param base_denominator number
 ---@param key string|nil optional seed key for associating results in loc_vars with in-game probability rolls
 ---@param from_roll boolean|nil
----@param source_context table|nil optional context during which function was called
 ---@param identifier? string optional seed key for associating results in loc_vars with in-game probability rolls
 ---@param no_mod boolean|nil optional boolean to bypass other probability modifying effects
 ---@return number numerator
@@ -663,21 +662,20 @@ function SMODS.merge_effects(...) end
 --- starting from a *`base_numerator` in `base_denominator`* probability.
 ---
 --- Can be hooked for more complex probability behaviour. `trigger_obj` is optionally the object that queues the probability.
-function SMODS.get_probability_vars(trigger_obj, base_numerator, base_denominator, identifier, from_roll, source_context, no_mod) end
+function SMODS.get_probability_vars(trigger_obj, base_numerator, base_denominator, identifier, from_roll, no_mod) end
 
 ---@param trigger_obj? Card|table
 ---@param seed string|number
 ---@param base_numerator number
 ---@param base_denominator number
 ---@param key string
----@param source_context table|nil optional context during which function was called
 ---@param no_mod boolean|nil optional boolean to bypass other probability modifying effects
 ---@return boolean
 --- Sets the seed to `seed` and runs a *`base_numerator` in `base_denominator`* listed probability check.
 --- Returns `true` if the probability succeeds. You do not need to multiply `base_numerator` by `G.GAME.probabilities.normal`.
 ---
 --- Can be hooked to run code when a listed probability succeeds and/or fails. `trigger_obj` is optionally the object that queues the probability.
-function SMODS.pseudorandom_probability(trigger_obj, seed, base_numerator, base_denominator, identifier, source_context, no_mod) end
+function SMODS.pseudorandom_probability(trigger_obj, seed, base_numerator, base_denominator, identifier, no_mod) end
 
 ---@param handname PokerHands|string
 ---@return boolean
