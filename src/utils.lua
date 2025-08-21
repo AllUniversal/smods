@@ -2887,47 +2887,6 @@ function SMODS.scale_card(card, args)
     end
 end
 
-local calculate_jokerref = Card.calculate_joker
-function Card:calculate_joker(context, ...)
-    SMODS.push_to_context_stack(context, "utils.lua : Card.calculate_joker")
-    local ret, ret2 = calculate_jokerref(self, context, ...)
-    if self.ability.name == "Caino" or self.ability.name == "Glass Joker" then
-        if context.remove_playing_cards then
-            if self.ability.name == "Caino" then
-                local faces = 0
-                for k, v in ipairs(context.removed) do
-                    if v:is_face() then
-                        faces = faces + 1
-                    end
-                end
-                if faces > 0 then
-                    SMODS.scale_card(self, {
-                        ref_table = self.ability,
-                        ref_value = "caino_xmult",
-                        scalar_value = "extra",
-                    })
-                end
-            else
-                local glasses = 0
-                for k, v in ipairs(context.removed) do
-                    if v.shattered then
-                        glasses = glasses + 1
-                    end
-                end
-                if glasses > 0 then
-                    SMODS.scale_card(self, {
-                        ref_table = self.ability,
-                        ref_value = "x_mult",
-                        scalar_value = "extra",
-                    })
-                end
-            end
-        end
-    end
-    SMODS.pop_from_context_stack(context, "utils.lua : Card.calculate_joker")
-    return ret, ret2
-end
-
 function SMODS.additive_scaling(ref_table, ref_value, initial, modifier)
     ref_table[ref_value] = initial + modifier
 end
