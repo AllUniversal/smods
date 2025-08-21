@@ -100,9 +100,9 @@
 ---@field new_suit? Suits|string New suit the card changed to.
 ---@field old_suit? Suits|string Old suit the card changed from.
 ---@field round_eval? true Check if `true` for effects during round evaluation (cashout screen).
----@field get_ranks? true Check if `true` for modifying the rank(s) of the context.other_card. 
----@field eval_getting_ranks? table Passed as flag in context.get_ranks by hand type evaluation when calling get_ranks(). (Allows quantum ranks exclusively during / outside hand type evaluation)
----@field is_face_getting_ranks? table Passed as flag in context.get_ranks by Card:is_face() when calling get_ranks(). (Allows quantum ranks exclusively during / outside is_face() evaluation)
+---@field get_ranks? true Check if `true` for modifying the rank(s) of the context.card. 
+---@field eval_getting_ranks? table Passed as flag in context.get_ranks / by hand type evaluation when calling get_ranks() / SMODS.has_any_rank(). (Allows quantum ranks exclusively during / outside hand type evaluation)
+---@field is_face_getting_ranks? table Passed as flag in context.get_ranks by Card:is_face() when calling get_ranks() / SMODS.has_any_rank(). (Allows quantum ranks exclusively during / outside is_face() evaluation)
 ---@field no_mod? boolean Check if `true` to decide whether an effect should modify context.get_ranks' ranks field. (If you want to override and block other effects, return `no_mod=true` alongside ranks=[only your ranks])
 ---@field money_altered? true Check if `true` for effects when the amount of money the player has changes.
 ---@field from_shop? true Check if `true` if money changed during the shop.
@@ -119,7 +119,7 @@ function SMODS.merge_lists(...) end
 --- A table of SMODS feature that mods can choose to enable.
 ---@class SMODS.optional_features: table
 ---@field quantum_enhancements? boolean Enables "Quantum Enhancement" contexts. Cards can count as having multiple enhancements at once.
----@field quantum_ranks? boolean Enables "Quantum Ranks", allowing playing cards to have more than one rank.
+---@field quantum_ranks? boolean Enables "Quantum Ranks" contexts. Cards can count as more than one rank.
 ---@field retrigger_joker? boolean Enables "Joker Retrigger" contexts. Jokers can be retriggered by other jokers or effects.
 ---@field post_trigger? boolean Enables "Post Trigger" contexts. Allows calculating effects after a Joker has been calculated.
 ---@field cardareas? SMODS.optional_features.cardareas Enables additional CardArea calculation.
@@ -286,6 +286,12 @@ function SMODS.has_any_suit(card) end
 ---@return boolean?
 --- Checks if the card counts as having no rank.
 function SMODS.has_no_rank(card) end
+
+---@param card Card|table
+---@param flags table|nil Used by poker hand eval / is_face eval, allows Wild ranks exclusively during / outside those evals. 
+---@return boolean?
+--- Checks if the card counts as having all ranks.
+function SMODS.has_any_rank(card, flags) end
 
 ---@param card Card|table
 ---@return boolean?

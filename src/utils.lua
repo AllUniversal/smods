@@ -1062,8 +1062,23 @@ function SMODS.has_any_suit(card)
     end
 end
 function SMODS.has_no_rank(card)
+    local is_stone = false
+    local is_wild = false
     for k, _ in pairs(SMODS.get_enhancements(card)) do
-        if k == 'm_stone' or G.P_CENTERS[k].no_rank then return true end
+        if k == 'm_stone' or G.P_CENTERS[k].no_rank then is_stone = true end
+        if G.P_CENTERS[k].any_rank then is_wild = true end
+    end
+    return is_stone and not is_wild
+end
+-- Hook this to add other Wild Rank effects. [flags] param is the same as Card:get_ranks()'s
+function SMODS.has_any_rank(card, flags)
+    for k, _ in pairs(SMODS.get_enhancements(card)) do
+        if G.P_CENTERS[k].any_rank then return true end
+    end
+    if (G.P_CENTERS[(card.edition or {}).key] or {}).any_rank then return true end
+    if (G.P_SEALS[card.seal or {}] or {}).any_rank then return true end
+    for k, v in pairs(SMODS.Stickers) do
+        if v.any_rank and card.ability[k] then return true end
     end
 end
 function SMODS.always_scores(card)
@@ -2474,7 +2489,7 @@ function SMODS.info_queue_desc_from_rows(desc_nodes, empty, maxw)
   }}
 end
 
-function SMODS.destroy_cards(cards, bypass_eternal, immediate)
+function SMODS.destroy_cards(cards, bypass_eternal, immediate, skip_anim)
     if not cards[1] then
         cards = {cards}
     end
@@ -2492,6 +2507,7 @@ function SMODS.destroy_cards(cards, bypass_eternal, immediate)
             if card.base.name then
                 playing_cards[#playing_cards + 1] = card
             end
+            card.skip_destroy_animation = skip_anim
         end
     end
     
@@ -2691,6 +2707,7 @@ function SMODS.is_eternal(card, trigger)
     return ret
 end
 
+-- Card rank functions
 function SMODS.get_rank_from_id(id)
     for _, rank in pairs(SMODS.Ranks) do
         if rank.id == id then
@@ -2704,11 +2721,13 @@ function Card:is_rank(rank, bypass_debuff, flags) -- Accepts SMODS.Rank, a rank 
     if not rank then return false end
     
     if (not bypass_debuff and self.debuff) or not SMODS.optional_features.quantum_ranks then
-        if not self.vampired and SMODS.has_enhancement(self, "m_stone") then
+        if not self.vampired and SMODS.has_no_rank(self) then
             return false
         end
         return SMODS.Ranks[self.base.value] == rank or self.base.value == rank or self.base.id == rank
     end
+
+    if SMODS.has_any_rank(self) then return true end
 
     for _, r in ipairs(self:get_ranks(flags)) do
         if r == rank or r.key == rank or r.id == rank then
@@ -2722,7 +2741,7 @@ function Card:is_any_rank(ranks, bypass_debuff, flags)
     if not ranks then return false end
 
     if (not bypass_debuff and self.debuff) or not SMODS.optional_features.quantum_ranks then
-        if not self.vampired and SMODS.has_enhancement(self, "m_stone") then
+        if not self.vampired and SMODS.has_no_rank(self) then
             return false
         end
         for _, rank in pairs(ranks) do
@@ -2733,11 +2752,11 @@ function Card:is_any_rank(ranks, bypass_debuff, flags)
         return false
     end
 
+    if SMODS.has_any_rank(self) then return true end
+
     local rank_dict = {}
     for _, v in pairs(ranks) do
-        if v then
-            rank_dict[v] = true
-        end
+        rank_dict[v] = true
     end
 
     if not next(rank_dict) then return false end
@@ -2751,22 +2770,33 @@ function Card:is_any_rank(ranks, bypass_debuff, flags)
 end
 
 function Card:get_ranks(flags) -- Returns a table of "SMODS.Rank"s, sanitized to ONLY be "SMODS.Rank"s -> Rank keys or rank ids are converted to SMODS.Rank 
-    local default_ranks = (not self.vampired and SMODS.has_enhancement(self, "m_stone") and {}) or {SMODS.Ranks[self.base.value]}
+    local default_ranks = (not self.vampired and SMODS.has_no_rank(self) and {}) or {SMODS.Ranks[self.base.value]}
     if not SMODS.optional_features.quantum_ranks then return default_ranks end
 
     flags = flags or {}
+    local context = {get_ranks = true, card = self, ranks = default_ranks, no_mod = false}
+    for key, flag in pairs(flags) do
+        context[key] = flag
+    end
 
-    local eval = SMODS.calculate_context({get_ranks = true, card = self, ranks = default_ranks, no_mod = false, eval_getting_ranks = flags.eval_getting_ranks}) or {}
+    local eval = SMODS.calculate_context(context) or {}
 
     if not eval.ranks then return default_ranks end
 
+    -- Convert returned ranks to SMODS.Rank and deduplicate
+    local rank_map = {}
     for i, r in ipairs(eval.ranks) do
+        local rank = nil
         if type(r) == "string" then
-            eval.ranks[i] = SMODS.Ranks[r]
+            rank = SMODS.Ranks[r]
         elseif type(r) == "table" and r.key then
-            eval.ranks[i] = SMODS.Ranks[r.key]
+            rank = SMODS.Ranks[r.key]
         elseif type(r) == "number" then
-            eval.ranks[i] = SMODS.get_rank_from_id(r)
+            rank = SMODS.get_rank_from_id(r)
+        end
+        if rank and not rank_map[rank] then
+            eval.ranks[i] = rank
+            rank_map[rank] = true
         end
     end
 
@@ -2812,7 +2842,7 @@ G.FUNCS.SMODS_scoring_calculation_function = function(e)
         if G.GAME.current_scoring_calculation.colour and operator then
             operator.children[1].config.colour = type(G.GAME.current_scoring_calculation.colour) == 'function' and G.GAME.current_scoring_calculation:colour() or G.GAME.current_scoring_calculation.colour
         end
-        if operator then operator.UIBox:recalculate() end
+        if operator and (type(G.GAME.current_scoring_calculation.colour) == 'function' or type(G.GAME.current_scoring_calculation.text) == 'function') then operator.UIBox:recalculate() end
     end
 end
 
@@ -3111,19 +3141,26 @@ function CardArea:handle_card_limit(card_limit, card_slots)
     if (self.config.type == 'joker' or self.config.type == 'hand') and not self.config.fixed_limit then
         card_limit = card_limit or 0
         card_slots = card_slots or 0
-        G.E_MANAGER:add_event(Event({
-            trigger = 'immediate',
-            func = function()
-                if card_limit then
+        if card_limit ~= 0 then
+            G.E_MANAGER:add_event(Event({
+                trigger = 'immediate',
+                func = function()
                     self.config.card_limit = self.config.card_limit + card_limit
                     self.config.true_card_limit = math.max(0, self.config.true_card_limit + card_limit)
+                    return true
                 end
-                if card_slots then
+            }))
+        end
+        if card_slots ~= 0 then
+            G.E_MANAGER:add_event(Event({
+                trigger = 'immediate',
+                func = function()
                     self.config.card_limit = self.config.card_limit - card_slots
+                    return true
                 end
-                return true
-            end
-        }))
+            }))
+            
+        end
         if G.hand and self == G.hand and card_limit - card_slots > 0 then 
             G.FUNCS.draw_from_deck_to_hand(math.min(card_limit - card_slots, (self.config.card_limit + card_limit - card_slots) - #self.cards))
         end
