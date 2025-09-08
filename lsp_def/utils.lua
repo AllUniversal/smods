@@ -703,12 +703,12 @@ function SMODS.add_to_pool(prototype_obj, args) end
 
 
 ---@param context CalcContext|table The context being pushed
----@param func string|nil The function/file from which the call originates
---- Pushes a context to the SMODS.context_stack. (Form: {context=context, count=[number of consecutive pushes]})
+---@param func string|nil The function/file name from which the call originates (for debugging)
+--- Pushes a context to the SMODS.context_stack. (Form: {context=[context], count=[number of consecutive pushes], caller=[SMODS.current_evaluated_object when push occured]})
 function SMODS.push_to_context_stack(context, func) end
 
 ---@param context CalcContext|table The context being popped
----@param func string|nil The function/file from which the call originates
+---@param func string|nil The function/file name from which the call originates (for debugging)
 --- Pop a context from the SMODS.context_stack. (Removes 1 from .count)
 function SMODS.pop_from_context_stack(context, func) end
 
