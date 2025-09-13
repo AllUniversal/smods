@@ -1251,6 +1251,9 @@ SMODS.calculate_individual_effect = function(effect, scored_card, key, amount, f
 
     if (key == 'p_dollars' or key == 'dollars' or key == 'h_dollars') and amount then
         if effect.card and effect.card ~= scored_card then juice_card(effect.card) end
+        SMODS.ease_dollars_calc = true
+        ease_dollars(amount)    
+        SMODS.ease_dollars_calc = nil
         if not effect.remove_default_message then
             if effect.dollar_message then
                 card_eval_status_text(effect.message_card or effect.juice_card or scored_card or effect.card or effect.focus, 'extra', nil, percent, nil, effect.dollar_message)
@@ -1258,7 +1261,13 @@ SMODS.calculate_individual_effect = function(effect, scored_card, key, amount, f
                 card_eval_status_text(effect.message_card or effect.juice_card or scored_card or effect.card or effect.focus, 'dollars', amount, percent)
             end
         end
-        ease_dollars(amount)
+        SMODS.calculate_context({
+            money_altered = true,
+            amount = amount,
+            from_shop = (G.STATE == G.STATES.SHOP or G.STATE == G.STATES.SMODS_BOOSTER_OPENED or G.STATE == G.STATES.SMODS_REDEEM_VOUCHER) or nil,
+            from_consumeable = (G.STATE == G.STATES.PLAY_TAROT) or nil,
+            from_scoring = (G.STATE == G.STATES.HAND_PLAYED) or nil,
+        })
         return true
     end
 
@@ -2660,7 +2669,7 @@ function SMODS.destroy_cards(cards, bypass_eternal, immediate, skip_anim)
     if next(playing_cards) then SMODS.calculate_context({scoring_hand = cards, remove_playing_cards = true, removed = playing_cards}) end
 
     for i = 1, #cards do
-        if immediate then
+        if immediate or skip_anim then
             if cards[i].shattered then
                 cards[i]:shatter()
             elseif cards[i].destroyed then
@@ -3208,6 +3217,7 @@ end
 local ease_dollar_ref = ease_dollars
 function ease_dollars(mod, instant)
     ease_dollar_ref(mod, instant)
+    if SMODS.ease_dollars_calc then return end
     SMODS.calculate_context({
         money_altered = true,
         amount = mod,
