@@ -3328,16 +3328,3 @@ function CardArea:handle_card_limit(card_limit, card_slots)
         end
     end
 end
-
-function CardArea:load_card_limit()
-    if SMODS.should_handle_limit(self) and self.cards then
-        for _, card in ipairs(self.cards) do
-            local card_limit = card.ability and card.ability.card_limit or 0
-            local card_slots = card.ability and card.ability.extra_slots_used or 0
-            self.config.card_limit = self.config.card_limit + card_limit
-            self.config.no_true_limit = true
-            self.config.card_limit = self.config.card_limit - card_slots
-            self.config.no_true_limit = false
-        end
-    end
-end
