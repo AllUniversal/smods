@@ -564,8 +564,7 @@ function SMODS.check_applied_stakes(stake, deck)
 end
 
 function G.UIDEF.stake_option(_type)
-	G.viewed_stake = G.viewed_stake or 1
-
+	
 	local middle = {n=G.UIT.R, config={align = "cm", minh = 1.7, minw = 7.3}, nodes={
 		{n=G.UIT.O, config={id = nil, func = 'RUN_SETUP_check_stake2', object = Moveable()}},
 	}}
@@ -573,6 +572,7 @@ function G.UIDEF.stake_option(_type)
 	local stake_options = {}
 	local curr_options = {}
 	local deck_usage = G.PROFILES[G.SETTINGS.profile].deck_usage[G.GAME.viewed_back.effect.center.key]
+	G.viewed_stake = deck_usage and (deck_usage.wins_by_key[SMODS.stake_from_index(G.viewed_stake)] and G.viewed_stake or (get_deck_win_stake(G.GAME.viewed_back.effect.center.key) + 1)) or 1
 	for i=1, #G.P_CENTER_POOLS.Stake do
 		if G.PROFILES[G.SETTINGS.profile].all_unlocked or SMODS.check_applied_stakes(G.P_CENTER_POOLS.Stake[i], deck_usage or {wins_by_key = {}}) then
 			stake_options[#stake_options + 1] = i
@@ -588,8 +588,8 @@ function G.UIDEF.stake_option(_type)
 end
 
 G.FUNCS.change_stake = function(args)
-	G.viewed_stake = args.to_val
-	G.PROFILES[G.SETTINGS.profile].MEMORY.stake = args.to_val
+	G.viewed_stake = args.to_val or args.to_key
+	G.PROFILES[G.SETTINGS.profile].MEMORY.stake = args.to_val or args.to_key
 end
 
 --#endregion
@@ -2184,11 +2184,9 @@ function get_pack(_key, _type)
 		local add
 		v.current_weight = v.get_weight and v:get_weight() or v.weight or 1
         if (not _type or _type == v.kind) then add = true end
-		if v.in_pool and type(v.in_pool) == 'function' then
-			local res, pool_opts = SMODS.add_to_pool(v)
-			pool_opts = pool_opts or {}
-			add = res and (add or pool_opts.override_base_checks)
-		end
+		local res, pool_opts = SMODS.add_to_pool(v)
+		pool_opts = pool_opts or {}
+		add = res and (add or pool_opts.override_base_checks)
 		if add and not G.GAME.banned_keys[v.key] then cume = cume + (v.current_weight or 1); temp_in_pool[v.key] = true end
     end
     local poll = pseudorandom(pseudoseed((_key or 'pack_generic')..G.GAME.round_resets.ante))*cume
@@ -2372,7 +2370,7 @@ end
 local ease_ante_ref = ease_ante
 function ease_ante(mod)
 	local flags = SMODS.calculate_context({modify_ante = mod, ante_end = SMODS.ante_end})
-	if flags.modify then mod = mod + flags.modify end
+	if flags.modify then mod = flags.modify end
 	ease_ante_ref(mod)
 	SMODS.calculate_context({ante_change = mod, ante_end = SMODS.ante_end})
 end
