@@ -399,6 +399,12 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     ----- API CODE GameObject.Atlas
     -------------------------------------------------------------------------------------------------
 
+    local atlas_table_map = {
+        ASSET_ATLAS = "ASSET_ATLAS",
+        ANIMATION_ATLAS = "ANIMATION_ATLAS",
+        STATE_ATLAS = "ANIMATION_ATLAS",
+    }
+
     SMODS.Atlases = {}
     SMODS.Atlas = SMODS.GameObject:extend {
         obj_table = SMODS.Atlases,
@@ -440,7 +446,11 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 ('Failed to initialize image data for Atlas %s'):format(self.key))
             self.image = love.graphics.newImage(self.image_data,
                 { mipmaps = true, dpiscale = G.SETTINGS.GRAPHICS.texture_scaling })
-            G[self.atlas_table][self.key_noloc or self.key] = self
+
+            self.columns = self.image:get_width() / self.px
+            self.rows = self.image:get_height() / self.py
+
+            G[atlas_table_map[self.atlas_table]][self.key_noloc or self.key] = self
 
             local mipmap_level = SMODS.config.graphics_mipmap_level_options[SMODS.config.graphics_mipmap_level]
             if not self.disable_mipmap and mipmap_level and mipmap_level > 0 then
@@ -3804,6 +3814,136 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         func = function(self, chips, mult, flames) return chips ^ mult end,
         text = '^'
     }
+
+
+    -------------------------------------------------------------------------------------------------
+    ------- API CODE Object.Node.Moveable.Sprite.AnimatedSprite.StateSprite
+    -------------------------------------------------------------------------------------------------
+
+
+    StateSprite = AnimatedSprite:extend()
+
+    -- Form of param [states] is; 
+    -- { [state_name] = { start_pos = { x/y = [0..n-1 for n columns/rows in sprite atlas] }, (frames = [amount of frames] |OR| end_pos = { [same as start_pos] }), (optional) flipped_h/flipped_v = true }, ...}
+    -- Example;
+    --[[
+    {
+        sleepy = {
+            start_pos = {x = 0, y = 0},
+            end_pos = {x = 3} (y is set to start_pos.y)
+        },
+        wakey = {
+            start_pos = {x = 4}, (y is set to 0)
+            frames = 4 (end_pos is set to start_pos with .x + frames)
+        },
+        lookey = {
+            flipped_h = true, (start_pos is set to {x = 0, y = 0}, end_pos is set to start_pos => this state is a single frame "animation" at x = 0, y = 0, and flipped horizontally and vertically)
+            flipped_v = true
+        }
+    }
+    ]]
+    -- To change state, call StateSprite:set_state(state_name)
+    function StateSprite:init(X, Y, W, H, new_sprite_atlas, states, start_state, states_offset)
+        AnimatedSprite.init(self, X, Y, W, H, new_sprite_atlas, {x=0, y=0})
+
+        self.states_offset = states_offset and {x = states_offset.x or 0, y = states_offset.y or 0} or {x = 0, y = 0}
+
+        self:load_states(states)
+        self:set_state(start_state)
+        self.state_name = start_state
+
+        self.flipped_h = false
+        self.flipped_v = false
+
+        if getmetatable(self) == StateSprite then
+            table.insert(G.I.SPRITE, self)
+        end
+    end
+
+    function StateSprite:set_state(state)
+        local a_state = self.a_states[state]
+        if a_state and self.state ~= a_state then
+            self.state = a_state
+            self:set_sprite_pos({x = self.state.start_pos.x + self.states_offset.x, y = self.state.start_pos.y + self.states_offset.y})
+            self.flipped_h = self.state.flipped_h
+            self.flipped_v = self.state.flipped_v
+        end
+    end
+
+    function StateSprite:load_states(states)
+        self.a_states = {}
+        for key, state in ipairs(states) do
+            state.start_pos = state.start_pos and {x = state.start_pos.x or 0, y = state.start_pos.y or 0} or {x = 0, y = 0}
+            state.end_pos = state.end_pos and {x = state.end_pos.x or state.start_pos.x + (state.frames or 0), y = state.end_pos.y or state.start_pos.y} or state.start_pos
+            self.a_states[key] = state
+        end
+    end
+
+    function StateSprite:animate()
+        local new_frame = self.state.start_pos.x + math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
+        local _x = new_frame % self.atlas.columns
+        local _y = math.floor(new_frame / self.atlas.columns)
+        if new_frame ~= self.current_animation.current then
+            self.current_animation.current = new_frame
+            -- self.frame_offset = math.floor(self.animation.w*(self.current_animation.current))
+            self.sprite:setViewport(
+                _x,
+                self.animation.h*self.animation.y + _y, -- Equivalent to;   self.state.start_pos.y + _y   (I think at least)
+                self.animation.w,
+                self.animation.h)
+        end
+        if self.float then 
+            self.T.r = 0.02*math.sin(2*G.TIMERS.REAL+self.T.x)
+            self.offset.y = -(1+0.3*math.sin(0.666*G.TIMERS.REAL+self.T.y))*self.shadow_parrallax.y
+            self.offset.x = -(0.7+0.2*math.sin(0.666*G.TIMERS.REAL+self.T.x))*self.shadow_parrallax.x
+        end
+    end
+
+    function StateSprite:set_sprite_pos(sprite_pos)
+        self.animation = {
+            x = sprite_pos and sprite_pos.x or 0,
+            y = sprite_pos and sprite_pos.y or 0,
+            frames = self.state and (self.state.end_pos.x - self.state.start_pos.x) or 1, current = 0,
+            w = self.scale.x, h = self.scale.y
+        }
+
+        self.frame_offset = 0 -- Unused
+
+        self.current_animation = {
+            current = 0,
+            frames = self.animation.frames,
+            w = self.animation.w,
+            h = self.animation.h}
+
+        self.image_dims = self.image_dims or {}
+        self.image_dims[1], self.image_dims[2] = self.atlas.image:getDimensions()
+
+        self.sprite = love.graphics.newQuad(
+            0,
+            self.animation.h*self.animation.y,
+            self.animation.w,
+            self.animation.h,
+            self.image_dims[1], self.image_dims[2]
+        )
+        self.offset_seconds = G.TIMERS.REAL
+    end
+
+    function StateSprite:draw_self()
+        if not self.states.visible then return end
+
+        prep_draw(self, 1)
+        love.graphics.scale(1/self.scale_mag)
+        love.graphics.setColor(G.C.WHITE)
+        love.graphics.draw(
+            self.atlas.image,
+            self.sprite,
+            0 ,0,
+            0,
+            self.VT.w/(self.T.w) * (self.flipped_h and -1 or 1),
+            self.VT.h/(self.T.h) * (self.flipped_v and -1 or 1)
+        )
+        love.graphics.pop()
+    end
 
 
     -------------------------------------------------------------------------------------------------
