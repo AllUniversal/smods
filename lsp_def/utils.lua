@@ -787,3 +787,15 @@ function Card:get_ranks(flags) end
 ---@param parity integer The parity to be checked. (See SMODS.Rank lsp def)
 ---@return boolean
 function Card:is_parity(parity) end
+
+---@param atlas_key string The key of the atlas 
+--- This function gets an atlas from G.ASSET_ATLAS or G.ANIMATION_ATLAS
+function SMODS.get_atlas(atlas_key) end
+
+---@param atlas_key string The key of the atlas 
+--- This function returns the Sprite or the AnimatedSprite class depending on the atlas type
+function SMODS.get_atlas_sprite_class(atlas_key) end
+
+---@param ... any Either the same parameters as Sprite() takes individually, or a list containing its params, or a table with keys according to each parameter
+--- This function creates a Sprite or AnimatedSprite depending on the atlas passed
+function SMODS.create_sprite(...) end
