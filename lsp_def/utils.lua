@@ -799,3 +799,19 @@ function SMODS.get_atlas_sprite_class(atlas_key) end
 ---@param ... any The same parameters as Sprite() takes individually. The atlas may be an atlas_key instead.
 --- This function creates a Sprite or AnimatedSprite depending on the atlas passed
 function SMODS.create_sprite(...) end
+
+---@param t? table The list to turn into a map
+---@return table
+--- This function turns a list into a mapping, so for {k: v} -> {v: true}
+function SMODS.to_map(t) end
+
+---@param t? table The table from which to get the keys.
+---@return table
+--- This function gets the keys of a table and returns them as a list
+function SMODS.get_keys(t) end
+
+---@param t? table The table of ranks to use as reference, SMODS.Ranks by default
+---@param objectified? boolean Whether to return a map of 'SMODS.Rank's or rank keys
+---@return table<SMODS.Rank|string, true|table>
+--- Helper function for straight calculation, gets SMODS.Ranks with respect to VirtualRanks
+function SMODS.get_straight_ranks(t, objectified) end
