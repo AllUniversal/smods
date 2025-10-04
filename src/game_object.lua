@@ -3905,6 +3905,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     end
 
     function StateSprite:animate()
+        if not self.state then return end
         local new_frame
         if type(self.state.frame_order) == "table" then
             self.current_animation.frame_index = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
