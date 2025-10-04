@@ -3982,7 +3982,17 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     StateSprite = AnimatedSprite:extend()
 
     -- Form of param [states] is; 
-    -- { [state_name] = { start_pos = { x/y = [0..n-1 for n columns/rows in sprite atlas] }, (frames = [amount of frames] |OR| end_pos = { [same as start_pos] }), (optional) flipped_h/flipped_v = true }, ...}
+    --[[
+    { 
+        [state_name] = { 
+            start_pos = { x/y = [0..n-1 for n columns/rows in sprite atlas] }, 
+            (frames = [amount of frames] |OR| end_pos = { [same as start_pos] }),
+            frame_order = "linear" |OR| "random" |OR| {1: x, 2: y, .. n: m}
+            (optional) flipped_h/flipped_v = true 
+        }, 
+        ...
+    }
+    ]]
     -- Example;
     --[[
     {
@@ -4033,12 +4043,35 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         for key, state in ipairs(states) do
             state.start_pos = state.start_pos and {x = state.start_pos.x or 0, y = state.start_pos.y or 0} or {x = 0, y = 0}
             state.end_pos = state.end_pos and {x = state.end_pos.x or state.start_pos.x + (state.frames or 0), y = state.end_pos.y or state.start_pos.y} or state.start_pos
+            if type(state.frame_order) == "string" then
+                local keymap = {
+                    linear=true,
+                    random=true
+                }
+                if not keymap[state.frame_order:lower()] then
+                    state.frame_order = "linear"
+                end
+            elseif type(state.frame_order) == "table" then
+                if not state.frame_order[1] then
+                    state.frame_order = "linear"
+                end
+            else
+                state.frame_order = "linear"
+            end
             self.a_states[key] = state
         end
     end
 
     function StateSprite:animate()
-        local new_frame = self.state.start_pos.x + math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
+        local new_frame
+        if type(self.state.frame_order) == "table" then
+            self.current_animation.frame_index = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
+            new_frame = self.state.frame_order[self.current_animation.frame_index] or self.current_animation.current
+        elseif self.state.frame_order == "linear" then
+            new_frame = self.state.start_pos.x + math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
+        elseif self.state.frame_order == "random" then
+            new_frame = math.random(0, self.current_animation.frames - 1)
+        end
         local _x = new_frame % self.atlas.columns
         local _y = math.floor(new_frame / self.atlas.columns)
         if new_frame ~= self.current_animation.current then
