@@ -2096,7 +2096,6 @@ function SMODS.blueprint_effect(copier, copied_card, context)
     context.blueprint_card = old_context_blueprint_card
     if other_joker_ret then
         other_joker_ret.card = eff_card
-        other_joker_ret.colour = G.C.BLUE
         return other_joker_ret
     end
 end
@@ -2311,12 +2310,12 @@ G.FUNCS.can_select_from_booster = function(e)
 
 function Card.selectable_from_pack(card, pack)
     if card.config.center.select_card then return card.config.center.select_card end
-    if pack.select_exclusions then
+    if pack and pack.select_exclusions then
         for _, key in ipairs(pack.select_exclusions) do
             if key == card.config.center_key then return false end
         end
     end
-    if pack.select_card then
+    if pack and pack.select_card then
         if type(pack.select_card) == 'table' then
             if pack.select_card[card.ability.set] then return pack.select_card[card.ability.set] else return false end
         end
