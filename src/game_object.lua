@@ -1162,7 +1162,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 vars =
                     specific_vars or {}
             }
-            if target.vars.is_info_queue then target.is_info_queue = true; target.vars.is_info_queue = nil end
             local res = {}
             if self.loc_vars and type(self.loc_vars) == 'function' then
                 res = self:loc_vars(info_queue, card) or {}
@@ -1403,7 +1402,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 AUT = full_UI_table,
                 vars = {}
             }
-            if target.vars.is_info_queue then target.is_info_queue = true; target.vars.is_info_queue = nil end
             local res = {}
             if self.loc_vars and type(self.loc_vars) == 'function' then
                 res = self:loc_vars(info_queue, card) or {}
@@ -1804,7 +1802,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 AUT = full_UI_table,
                 vars = specific_vars or {},
             }
-            if target.vars.is_info_queue then target.is_info_queue = true; target.vars.is_info_queue = nil end
             local res = {}
             if self.loc_vars and type(self.loc_vars) == 'function' then
                 res = self:loc_vars(info_queue, card) or {}
@@ -3082,7 +3079,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 AUT = full_UI_table,
                 vars = specific_vars
             }
-            if target.vars.is_info_queue then target.is_info_queue = true; target.vars.is_info_queue = nil end
             local res = {}
             if self.loc_vars and type(self.loc_vars) == 'function' then
                 -- card is actually a `Tag` here
