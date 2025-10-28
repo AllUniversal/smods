@@ -132,11 +132,6 @@ position = 'at'
 match_indent = true
 payload = '''function generate_card_ui(_c, full_UI_table, specific_vars, card_type, badges, hide_desc, main_start, main_end, card)
     if _c.specific_vars then specific_vars = _c.specific_vars end
-    local is_info_queue = false
-    if specific_vars and specific_vars.is_info_queue then
-        is_info_queue = true
-        specific_vars = nil
-    end
 '''
 
 [[patches]]
@@ -222,7 +217,6 @@ end
 -- handles card_limit/extra_slots_used changes
 self.ability.card_limit = self.ability.card_limit + (center.config.card_limit or 0)
 self.ability.extra_slots_used = self.ability.extra_slots_used + (center.config.extra_slots_used or 0)
-if self.area then self.area:handle_card_limit(center.config.card_limit, center.config.extra_slots_used) end
 
 
 -- reset keys do not persist on ability change
