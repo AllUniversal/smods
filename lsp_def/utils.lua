@@ -742,6 +742,22 @@ function SMODS.is_getter_context(context) end
 --- skipping the evaluation of the object and preventing an infinite loop.
 function SMODS.check_looping_context(eval_object) end
 
+---@param atlas_key string The key of the atlas 
+--- This function gets an atlas from G.ASSET_ATLAS or G.ANIMATION_ATLAS
+function SMODS.get_atlas(atlas_key) end
+
+---@param atlas_key string The key of the atlas 
+--- This function returns the Sprite or the AnimatedSprite class depending on the atlas type
+function SMODS.get_atlas_sprite_class(atlas_key) end
+
+---@param ... any The same parameters as Sprite() takes individually. The atlas may be an atlas_key instead.
+--- This function creates a Sprite or AnimatedSprite depending on the atlas passed
+function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
+
+---@param key string The key or name of the Blind to check
+---@param ignore_disabled? boolean Whether to ignore the Blind being disabled
+function SMODS.is_active_blind(key, ignore_disabled) end
+
 ---Check if `challenge` is unlocked.
 ---@param challenge SMODS.Challenge
 ---@param k? number Index of challenge in G.CHALLENGES. Only relevant for challenges defined outside SMODS

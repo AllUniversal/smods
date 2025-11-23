@@ -3,6 +3,20 @@ version = "1.0.0"
 dump_lua = true
 priority = -10
 
+# Reset SMODS.cards_to_draw on game start
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+match_indent = true
+position = 'after'
+pattern = '''
+local saveTable = args.savetext or nil
+'''
+payload = '''
+SMODS.cards_to_draw = nil
+'''
+
+
 # Set metatable
 [[patches]]
 [patches.pattern]
@@ -22,7 +36,7 @@ self.config = setmetatable({card_limits = {card_limit}}, {
     __newindex = function(t, key, value)
         if key == 'card_limit' then
             if not t.card_limits.base then rawset(t.card_limits, 'base', value) end
-            rawset(t.card_limits, 'mod', (t.card_limits.mod or 0) + (value - (t.card_limits.base)))
+            rawset(t.card_limits, 'mod', value - t.card_limits.base - (t.card_limits.extra_slots or 0))
         else
             rawset(t, key, value)
         end
@@ -51,7 +65,7 @@ self.config = setmetatable(cardAreaTable.config, {
     __newindex = function(t, key, value)
         if key == 'card_limit' then
             if not t.card_limits.base then rawset(t.card_limits, 'base', value) end
-            rawset(t.card_limits, 'mod', (t.card_limits.mod or 0) + (value - (t.card_limits.base)))
+            rawset(t.card_limits, 'mod', value - t.card_limits.base - (t.card_limits.extra_slots or 0))
         else
             rawset(t, key, value)
         end
@@ -74,21 +88,6 @@ payload = '''
         self.config.card_limits.mod = (self.config.card_limits.mod or 0) + delta
         return
     end
-'''
-
-
-# CardArea:init()
-# Add real_card_limit parameter
-[[patches]]
-[patches.pattern]
-target = 'cardarea.lua'
-match_indent = true
-position = 'after'
-pattern = '''
-self.config.card_limit = config.card_limit or 52
-'''
-payload = '''
-self.config.card_limits.total_slots = self.config.card_limit
 '''
 
 # CardArea:update()
@@ -268,23 +267,22 @@ pattern = "local hand_space = e or*"
 position = "at"
 payload = """local hand_space = e
 local cards_to_draw = {}
-if not hand_space then
-    local limit = G.hand.config.card_limit - #G.hand.cards - (SMODS.cards_to_draw or 0)
-    local unfixed = not G.hand.config.fixed_limit
-    local n = 0
-    while n < #G.deck.cards do
-        local card = G.deck.cards[#G.deck.cards-n]
-        local mod = unfixed and (card.ability.card_limit - card.ability.extra_slots_used) or 0
-        if limit - 1 + mod < 0 then
-        else    
-            limit = limit - 1 + mod
-            table.insert(cards_to_draw, card)
-            if limit <= 0 then break end
-        end
-        n = n + 1
+local space_taken = 0
+local limit = G.hand.config.card_limit - #G.hand.cards - (SMODS.cards_to_draw or 0)
+local unfixed = not G.hand.config.fixed_limit
+local n = 0
+while n < #G.deck.cards and limit > 0 do
+    local card = G.deck.cards[#G.deck.cards-n]
+    local mod = unfixed and (card.ability.card_limit - card.ability.extra_slots_used) or 0
+    if limit - 1 + mod < 0 then
+    else    
+        limit = limit - 1 + mod
+        table.insert(cards_to_draw, card)
+        space_taken = space_taken + (1 - mod)
     end
-    hand_space = #cards_to_draw
+    n = n + 1
 end
+hand_space = #cards_to_draw
 """
 match_indent = true
 
