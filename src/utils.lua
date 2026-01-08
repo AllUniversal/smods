@@ -359,7 +359,7 @@ function SMODS.create_card(t)
     if not t.area and t.key and G.P_CENTERS[t.key] then
         t.area = G.P_CENTERS[t.key].consumeable and G.consumeables or G.P_CENTERS[t.key].set == 'Joker' and G.jokers
     end
-    if not t.area and not t.key and t.set and SMODS.ConsumableTypes[t.set] then
+    if not t.area and not t.key and t.set and SMODS.ConsumableTypes[t.set] or t.set == 'Consumeables' then
         t.area = G.consumeables
     end
     if not t.key and t.set == 'Playing Card' or t.set == 'Base' or t.set == 'Enhanced' or (not t.set and (t.front or t.rank or t.suit)) then
@@ -821,6 +821,15 @@ function SMODS.poll_rarity(_pool_key, _rand_key)
     local available_rarities = copy_table(SMODS.ObjectTypes[_pool_key].rarities) -- Table containing a list of rarities and their rates
     local vanilla_rarities = {["Common"] = 1, ["Uncommon"] = 2, ["Rare"] = 3, ["Legendary"] = 4}
 
+	-- Check to see if any rarities are empty and should be disabled
+    for _, v in ipairs(available_rarities) do
+        local _pool = get_current_pool("Joker", v.key, false, nil)
+        if #_pool == 1 and _pool[1] == "empty_rarity" then
+            SMODS.remove_pool(available_rarities, v.key)
+        end
+    end
+    G.ARGS.TEMP_POOL = EMPTY(G.ARGS.TEMP_POOL)
+
     -- Calculate total rates of rarities
     local total_weight = 0
     for _, v in ipairs(available_rarities) do
@@ -1238,22 +1247,7 @@ SMODS.smart_level_up_hand = function(card, hand, instant, amount)
     -- Level ups in context.before on another hand AND any level up during scoring
     --     -> restore the current chips/mult
     -- Level ups outside anything -> always update to empty chips/mult
-    local vals_after_level
-    if SMODS.displaying_scoring and not (SMODS.displayed_hand == hand) then
-        vals_after_level = copy_table(G.GAME.current_round.current_hand)
-        local text,disp_text,_,_,_ = G.FUNCS.get_poker_hand_info(G.play.cards)
-        vals_after_level.handname = disp_text or ''
-        vals_after_level.level = (G.GAME.hands[text] or {}).level or ''
-        vals_after_level.chips = number_format(hand_chips) or 0
-        vals_after_level.mult = number_format(mult) or 0
-    end
-    if not (instant or SMODS.displayed_hand == hand) then
-        update_hand_text({sound = 'button', volume = 0.7, pitch = 0.8, delay = 0.3}, {handname=localize(hand, 'poker_hands'),chips = G.GAME.hands[hand].chips, mult = G.GAME.hands[hand].mult, level=G.GAME.hands[hand].level})
-    end
     level_up_hand(card, hand, instant, (type(amount) == 'number' or type(amount) == 'table') and amount or 1)
-    if not (instant or SMODS.displayed_hand == hand) then
-        update_hand_text({sound = 'button', volume = 0.7, pitch = 1.1, delay = 0}, vals_after_level or {mult = 0, chips = 0, handname = '', level = ''})
-    end
 end
 
 -- This function handles the calculation of each effect returned to evaluate play.
@@ -1385,7 +1379,7 @@ SMODS.calculate_individual_effect = function(effect, scored_card, key, amount, f
     end
 
     if key == 'remove' or key == 'debuff_text' or key == 'cards_to_draw' or key == 'numerator' or key == 'denominator' or key == 'no_destroy' or
-        key == 'replace_scoring_name' or key == 'replace_display_name' or key == 'replace_poker_hands' or key == 'ranks_changed' or key == 'ranks_fixed' or key == 'modify' then
+        key == 'replace_scoring_name' or key == 'replace_display_name' or key == 'replace_poker_hands' or key == 'ranks_changed' or key == 'ranks_fixed' or key == 'modify' or key == 'shop_create_flags' then
         return { [key] = amount }
     end
     
@@ -1487,7 +1481,8 @@ SMODS.other_calculation_keys = {
     'modify',
     'no_destroy', 'prevent_trigger',
     'replace_scoring_name', 'replace_display_name', 'replace_poker_hands',
-    'extra'
+    'shop_create_flags',
+    'extra',
 }
 SMODS.silent_calculation = {
     saved = true, effect = true, remove = true,
@@ -2156,14 +2151,25 @@ end
 function SMODS.blueprint_effect(copier, copied_card, context)
     if not copied_card or copied_card == copier or copied_card.debuff or context.no_blueprint or not copied_card.config.center.blueprint_compat then return end
     if (context.blueprint or 0) > #G.jokers.cards then return end
+
     local old_context_blueprint = context.blueprint
     context.blueprint = (context.blueprint and (context.blueprint + 1)) or 1
+    
     local old_context_blueprint_card = context.blueprint_card
     context.blueprint_card = context.blueprint_card or copier
+
+    context.blueprint_copiers_stack = context.blueprint_copiers_stack or {}
+    context.blueprint_copiers_stack[#context.blueprint_copiers_stack + 1] = copier
+    context.blueprint_copier = context.blueprint_copiers_stack[#context.blueprint_copiers_stack]
+
     local eff_card = context.blueprint_card
     local other_joker_ret = copied_card:calculate_joker(context)
+
     context.blueprint = old_context_blueprint
     context.blueprint_card = old_context_blueprint_card
+    table.remove(context.blueprint_copiers_stack, #context.blueprint_copiers_stack)
+    context.blueprint_copier = context.blueprint_copiers_stack[#context.blueprint_copiers_stack]
+
     if other_joker_ret then
         other_joker_ret.card = eff_card
         return other_joker_ret
@@ -2209,7 +2215,10 @@ function SMODS.get_card_areas(_type, _context)
         local t = {
             { object = G.GAME.selected_back, scored_card = G.deck and G.deck.cards[1] or G.deck },
         }
-        if G.GAME.blind then t[#t + 1] = { object = G.GAME.blind, scored_card = G.GAME.blind.children.animatedSprite } end
+
+        if G.GAME.blind and G.GAME.blind.children and G.GAME.blind.children.animatedSprite then 
+            t[#t + 1] = { object = G.GAME.blind, scored_card = G.GAME.blind.children.animatedSprite } 
+        end
         if G.GAME.challenge then t[#t + 1] = { object = SMODS.Challenges[G.GAME.challenge], scored_card = G.deck.cards[1] or G.deck } end 
         for _, stake in ipairs(SMODS.get_stake_scoring_targets()) do
             t[#t + 1] = { object = stake, scored_card = G.deck.cards[1] or G.deck }
@@ -2659,7 +2668,7 @@ function SMODS.destroy_cards(cards, bypass_eternal, immediate, skip_anim)
                     if cards[i].shattered then
                         cards[i]:shatter()
                     elseif cards[i].destroyed then
-                        cards[i]:start_dissolve()
+                        cards[i]:start_dissolve(nil, i == #cards)
                     end
                     return true
                 end
@@ -3435,13 +3444,14 @@ end
 
 function CardArea:handle_card_limit()
     if SMODS.should_handle_limit(self) then
-        self.config.card_limits.old_slots = self.config.card_limits.total_slots or 0
-        self.config.card_limits.extra_slots = self:count_property('card_limit')
-        self.config.card_limits.total_slots = self.config.card_limits.extra_slots + (self.config.card_limits.base or 0) + (self.config.card_limits.mod or 0)
-        self.config.card_limits.extra_slots_used = self:count_property('extra_slots_used')
+        if not G.TAROT_INTERRUPT then
+            self.config.card_limits.extra_slots = self:count_property('card_limit')
+            self.config.card_limits.total_slots = self.config.card_limits.extra_slots + (self.config.card_limits.base or 0) + (self.config.card_limits.mod or 0)
+            self.config.card_limits.extra_slots_used = self:count_property('extra_slots_used')
+        end
         self.config.card_count = #self.cards + self.config.card_limits.extra_slots_used
         
-        if G.hand and self == G.hand and self.config.card_count + (SMODS.cards_to_draw or 0) < self.config.card_limits.total_slots then
+        if G.hand and self == G.hand and (self.config.card_count or 0) + (SMODS.cards_to_draw or 0) < (self.config.card_limits.total_slots or 0) then
             if G.STATE == G.STATES.DRAW_TO_HAND and not SMODS.blind_modifies_draw(G.GAME.blind.config.blind.key) and not SMODS.draw_queued then
                 SMODS.draw_queued = true
                 G.E_MANAGER:add_event(Event({
@@ -3464,6 +3474,9 @@ function CardArea:handle_card_limit()
                 if (self.config.card_limits.total_slots - self.config.card_limits.old_slots) > 0 then
                     G.FUNCS.draw_from_deck_to_hand((self.config.card_limits.total_slots - self.config.card_limits.old_slots))
                 end
+            end
+            if self == G.hand and G.STATE == G.STATES.SELECTING_HAND or G.STATE == G.STATES.DRAW_TO_HAND then 
+                self.config.card_limits.old_slots = self.config.card_limits.total_slots or 0
             end
             return
         end
@@ -3519,7 +3532,153 @@ function SMODS.is_active_blind(naey, ignore_disabled)
     return G.GAME and G.GAME.blind and G.GAME.facing_blind and (G.GAME.blind.name == naey or G.GAME.blind.config.key == naey) and (not G.GAME.blind.disabled or ignore_disabled)
 end
 
+local animate = AnimatedSprite.animate
+function AnimatedSprite:animate()
+    if not self.current_animation.frames then return end
+    animate(self)
+end
+
 -- Function used to determine whether the current blind modifies the number of cards drawn
 function SMODS.blind_modifies_draw(key)
     if SMODS.Blinds.modifies_draw[key] then return true end
+end
+
+function SMODS.upgrade_poker_hands(args)
+    -- args.hands
+    -- args.parameters
+    -- args.func
+    -- args.level_up
+    -- args.instant
+    -- args.from
+
+    local function get_keys(t)
+        local keys = {}
+        for k, _ in pairs(t) do
+            table.insert(keys, k)
+        end
+        return keys
+    end
+
+    args.hands = args.hands or get_keys(G.GAME.hands)
+    if type(args.hands) == 'string' then args.hands = {args.hands} end
+    args.parameters = args.parameters or get_keys(SMODS.Scoring_Parameters)
+    local instant = args.instant
+
+    if not args.func then
+        for _, hand in ipairs(args.hands) do
+            level_up_hand(args.from, hand, instant, args.level_up or 1)
+        end
+        return
+    end
+    
+    assert(type(args.func) == 'function', "Invalid func provided to SMODS.upgrade_hands")
+
+    local vals_after_level
+    if SMODS.displaying_scoring then
+        vals_after_level = copy_table(G.GAME.current_round.current_hand)
+        local text,disp_text,_,_,_ = G.FUNCS.get_poker_hand_info(G.play.cards)
+        vals_after_level.handname = disp_text or ''
+        vals_after_level.level = (G.GAME.hands[text] or {}).level or ''
+        for name, p in pairs(SMODS.Scoring_Parameters) do
+            vals_after_level[name] = p.current
+        end
+    end
+        
+    local displayed = false
+    for _, hand in ipairs(args.hands) do
+        displayed = hand == SMODS.displayed_hand
+        if not instant then
+            update_hand_text({sound = 'button', volume = 0.7, pitch = 0.8, delay = 0.3}, {handname=localize(hand, 'poker_hands'), level=G.GAME.hands[hand].level})
+            for name, p in pairs(SMODS.Scoring_Parameters) do
+                p.current = G.GAME.hands[hand][name] or p.default_value
+                update_hand_text({nopulse = nil, delay = 0}, {[name] = p.current})
+            end
+        end
+        for i, parameter in ipairs(args.parameters) do
+            if G.GAME.hands[hand][parameter] then
+                G.GAME.hands[hand][parameter] = args.func(G.GAME.hands[hand][parameter], hand, parameter)
+                if not instant then
+                    G.E_MANAGER:add_event(Event({trigger = 'after', delay = i == 1 and 0.2 or 0.9, func = function()
+                        play_sound('tarot1')
+                        if args.from then args.from:juice_up(0.8, 0.5) end
+                        G.TAROT_INTERRUPT_PULSE = true
+                        return true end }))
+                    update_hand_text({delay = 0}, {[parameter] = G.GAME.hands[hand][parameter], StatusText = true})
+                end
+            end
+        end
+        if args.level_up then
+            G.GAME.hands[hand].level = G.GAME.hands[hand].level + (type(args.level_up) == 'number' and args.level_up or 1)
+            if not instant then
+                G.E_MANAGER:add_event(Event({trigger = 'after', delay = 0.9, func = function()
+                    play_sound('tarot1')
+                    if args.from then args.from:juice_up(0.8, 0.5) end
+                    G.TAROT_INTERRUPT_PULSE = nil
+                    return true end }))
+                update_hand_text({sound = 'button', volume = 0.7, pitch = 0.9, delay = 0}, {level=G.GAME.hands[hand].level})
+            end
+        end
+        if not instant then delay(1.3) end
+    end
+
+    if not instant and not displayed then
+        update_hand_text({sound = 'button', volume = 0.7, pitch = 1.1, delay = 0}, vals_after_level or {mult = 0, chips = 0, handname = '', level = ''})
+    end
+end
+
+SMODS.ease_types = {
+    lerp = function(percent_done) return percent_done end,
+    linear = function(percent_done) return percent_done end,
+    insine = function(percent_done) return 1 - math.cos((percent_done * math.pi) / 2) end,
+    outsine = function(percent_done) return math.cos((percent_done * math.pi) / 2) end,
+    inoutsine = function(percent_done) return -math.cos(percent_done * math.pi) - 1 / 2 end,
+    quad = function(percent_done) return percent_done * percent_done end,
+    inquad = function(percent_done) return percent_done * percent_done end,
+    outquad = function(percent_done) return 1 - (1 - percent_done) * (1 - percent_done) end,
+    inoutquad = function(percent_done) return (percent_done < 0.5 and 2 * percent_done * percent_done or 1 - math.pow(-2 * percent_done + 2, 2) / 2) end,
+    inexpo = function(percent_done) return math.pow(2, 10 * percent_done - 10) end,
+    outexpo = function(percent_done) return 1 - math.pow(2, -10 * percent_done) end,
+    inoutexpo = function(percent_done) return (percent_done < 0.5 and math.pow(2, 20 * percent_done - 10) / 2 or 2 - math.pow(2, -20 * percent_done + 10) / 2) end,
+    incirc = function(percent_done) return 1 - math.sqrt(1 - math.pow(percent_done, 2)) end,
+    outcirc = function(percent_done) return math.sqrt(1 - math.pow(percent_done - 1, 2)) end,
+    inoutcirc = function(percent_done) return (percent_done < 0.5 and (1 - math.sqrt(1 - math.pow(2 * percent_done, 2))) / 2 or (math.sqrt(1 - math.pow(-2 * percent_done + 2, 2)) + 1) / 2) end,
+    elastic = function(percent_done) return -math.pow(2, 10 * percent_done - 10) * math.sin((percent_done * 10 - 10.75) * 2*math.pi/3); end,
+    inelastic = function(percent_done) return -math.pow(2, 10 * percent_done - 10) * math.sin((percent_done * 10 - 10.75) * 2*math.pi/3); end,
+    outelastic = function(percent_done) return math.pow(2, -10 * percent_done) * math.sin((percent_done * 10 - 0.75) * (2 * math.pi) / 3) + 1 end,
+    inoutelastic = function(percent_done) return (percent_done < 0.5 and -(math.pow(2, 20 * percent_done - 10) * math.sin((20 * percent_done - 11.125) * (2 * math.pi) / 4.5)) / 2 or (math.pow(2, -20 * percent_done - 10) * math.sin((20 * percent_done - 11.125) * (2 * math.pi) / 4.5)) / 2 + 1) end,
+    inback = function(percent_done, c1, c2, c3) return c3 * percent_done * percent_done * percent_done - c1 * percent_done * percent_done end,
+    outback = function(percent_done, c1, c2, c3) return 1 + c3 * math.pow(percent_done - 1, 3) + c1 * math.pow(percent_done - 1, 2) end,
+    inoutback = function(percent_done, c1, c2, c3) return (percent_done < 0.5 and (math.pow(2 * percent_done, 2) * ((c2 + 1) * 2 * percent_done - c2)) / 2 or (math.pow(2 * percent_done - 2, 2) * ((c2 + 1) * (percent_done * 2 - 2) + c2) + 2) / 2) end,
+}
+
+-- Internal function used to provide more helpful crash messages when using assert
+function SMODS.log_crash_info(info, defined)
+    if not info then return end
+    local str = info.source:sub(3, -2)
+    local props = {}
+    local line = defined and info.linedefined or info.currentline
+    local line_message = defined and ' in function defined' or ''
+    -- Split by space
+    for v in string.gmatch(str, "[^%s]+") do
+        table.insert(props, v)
+    end
+    local source = table.remove(props, 1)
+    if source == "love" then
+        return string.format("\n\nError exists in LÖVE file in '%s'%s at line %d\r\n", table.concat(props, " "):sub(2, -2), line_message, line)
+    elseif source == "SMODS" then
+        local modID = table.remove(props, 1)
+        local fileName = table.concat(props, " ")
+        if modID == '_' then
+            return string.format("\n\nError exists in Steamodded in file '%s'%s at line %d\r\n", fileName:sub(2, -2), line_message, line)
+        else
+            return string.format("\n\nError exists in %s in file '%s'%s at line %d", SMODS.Mods[modID].name, fileName:sub(2, -2), line_message, line)
+        end
+    elseif source == "lovely" then
+        local module = table.remove(props, 1)
+        local fileName = table.concat(props, " ")
+        return string.format("\n\nError exists in file '%s' at line %d (from lovely module %s)\r\n",
+            fileName:sub(2, -2), line, module)
+    else
+        return string.format("\n\nError exists in %s at line %d\r\n", info.source, line)
+    end
 end

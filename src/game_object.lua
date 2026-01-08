@@ -276,7 +276,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     -------------------------------------------------------------------------------------------------
     ----- API CODE GameObject.Font
     -------------------------------------------------------------------------------------------------
-    
     SMODS.Fonts = {}
     SMODS.Font = SMODS.GameObject:extend {
         obj_table = SMODS.Fonts,
@@ -311,7 +310,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 ('Failed to collect file data for Font %s'):format(self.key))
             self.FONT = assert(love.graphics.newFont(file_data, self.render_scale or G.TILESIZE),
                 ('Failed to initialize font data for Font %s'):format(self.key))
-            
         end,
         process_loc_text = function() end,
     }
@@ -319,7 +317,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     -------------------------------------------------------------------------------------------------
     ----- API CODE GameObject.DynaTextEffect
     -------------------------------------------------------------------------------------------------
-    
     SMODS.DynaTextEffects = {}
     SMODS.DynaTextEffect = SMODS.GameObject:extend {
         obj_table = SMODS.DynaTextEffects,
@@ -583,10 +580,10 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             if replace_sound.args then
                 local args = replace_sound.args
                 if type(args) == 'function' then args = args(sound, { pitch = per, volume = vol }) end
-                play_sound(sound.sound_code, args.pitch, args.volume)
+                play_sound_ref(sound.sound_code, args.pitch, args.volume)
                 if not args.continue_base_sound then rt = true end
             else
-                play_sound(sound.sound_code, per, vol)
+                play_sound_ref(sound.sound_code, per, vol)
                 rt = true
             end
             if replace_sound.times > 0 then replace_sound.times = replace_sound.times - 1 end
@@ -605,6 +602,48 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     end
 
     SMODS.Sound{ key = 'xchips', path = 'xchips.ogg'}
+
+    -------------------------------------------------------------------------------------------------
+    ------- API CODE GameObject.Gradient
+    -------------------------------------------------------------------------------------------------
+
+    SMODS.Gradients = {}
+    SMODS.Gradient = SMODS.GameObject:extend {
+        obj_table = SMODS.Gradients,
+        obj_buffer = {},
+        required_params = { 'key' },
+        interpolation = 'trig',
+        cycle = 10,
+        colours = {},
+        inject = function(self) self[1], self[2], self[3], self[4] = 0,0,0,1 end,
+        update = function(self, dt)
+            if #self.colours < 2 then return end
+            local timer = G.TIMERS.REAL%self.cycle
+            local start_index = math.ceil(timer*#self.colours/self.cycle)
+            local end_index = start_index == #self.colours and 1 or start_index+1
+            local start_colour, end_colour = self.colours[start_index], self.colours[end_index]
+            local partial_timer = (timer%(self.cycle/#self.colours))*#self.colours/self.cycle
+            for i = 1, 4 do
+                if self.interpolation == 'linear' then
+
+                    self[i] = start_colour[i] + partial_timer*(end_colour[i]-start_colour[i])
+                elseif self.interpolation == 'trig' then
+                    self[i] = start_colour[i] + 0.5*(1-math.cos(partial_timer*math.pi))*(end_colour[i]-start_colour[i])
+                end
+            end
+        end,
+    }
+    SMODS.Gradient {
+        key = 'warning_bg',
+        colours = { G.C.RED, G.C.GREEN },
+        cycle = 1,
+    }
+    SMODS.Gradient {
+        key = 'warning_text',
+        colours = { G.C.WHITE, G.C.RED },
+        cycle = 1,
+    }
+
 
     -------------------------------------------------------------------------------------------------
     ----- API CODE GameObject.Stake
@@ -1185,7 +1224,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             end
 
             localize(target)
-            
             if res.main_end then
                 desc_nodes[#desc_nodes + 1] = res.main_end
             end
@@ -1201,7 +1239,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         rarity = 1,
         unlocked = true,
         discovered = false,
-        blueprint_compat = false,
+        blueprint_compat = true,
         perishable_compat = true,
         eternal_compat = true,
         pos = { x = 0, y = 0 },
@@ -2072,7 +2110,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 else
                     table.insert(self.obj_buffer, self.key)
                 end
-                
             end
         end,
         process_loc_text = function(self)
@@ -2877,6 +2914,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         visible = true,
         played = 0,
         played_this_round = 0,
+        played_this_ante = 0,
         level = 1,
         set = 'PokerHand',
         process_loc_text = function(self)
@@ -2891,6 +2929,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 self.level = self.level
                 self.played = self.played
                 self.played_this_round = self.played_this_round
+                self.played_this_ante = self.played_this_ante
                 self.obj_table[self.key] = self
                 self.obj_buffer[#self.obj_buffer + 1] = self.key
             end
@@ -3414,6 +3453,10 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             self.full_path = (self.mod and self.mod.path or SMODS.path) ..
                 'assets/shaders/' .. self.path
             local file = NFS.read(self.full_path)
+            local lovely_success, lovely = pcall(require, "lovely")
+            if lovely_success and lovely.apply_patches then
+                file = assert(lovely.apply_patches("=[SMODS " .. self.mod.id .. ' "' .. self.path .. '"]', file))
+            end
             love.filesystem.write(self.key .. "-temp.fs", file)
             G.SHADERS[self.key] = love.graphics.newShader(self.key .. "-temp.fs")
             love.filesystem.remove(self.key .. "-temp.fs")
@@ -3724,47 +3767,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     }
 
     -------------------------------------------------------------------------------------------------
-    ------- API CODE GameObject.Gradient
-    -------------------------------------------------------------------------------------------------
-
-    SMODS.Gradients = {}
-    SMODS.Gradient = SMODS.GameObject:extend {
-        obj_table = SMODS.Gradients,
-        obj_buffer = {},
-        required_params = { 'key' },
-        interpolation = 'trig',
-        cycle = 10,
-        colours = {},
-        inject = function(self) self[1], self[2], self[3], self[4] = 0,0,0,1 end,
-        update = function(self, dt)
-            if #self.colours < 2 then return end
-            local timer = G.TIMERS.REAL%self.cycle
-            local start_index = math.ceil(timer*#self.colours/self.cycle)
-            local end_index = start_index == #self.colours and 1 or start_index+1
-            local start_colour, end_colour = self.colours[start_index], self.colours[end_index]
-            local partial_timer = (timer%(self.cycle/#self.colours))*#self.colours/self.cycle
-            for i = 1, 4 do
-                if self.interpolation == 'linear' then
-
-                    self[i] = start_colour[i] + partial_timer*(end_colour[i]-start_colour[i])
-                elseif self.interpolation == 'trig' then
-                    self[i] = start_colour[i] + 0.5*(1-math.cos(partial_timer*math.pi))*(end_colour[i]-start_colour[i])
-                end
-            end
-        end,
-    }
-    SMODS.Gradient {
-        key = 'warning_bg',
-        colours = { G.C.RED, G.C.GREEN },
-        cycle = 1,
-    }
-    SMODS.Gradient {
-        key = 'warning_text',
-        colours = { G.C.WHITE, G.C.RED },
-        cycle = 1,
-    }
-
-    -------------------------------------------------------------------------------------------------
     ------- API CODE GameObject.Scoring_Calculation
     -------------------------------------------------------------------------------------------------
 
@@ -3803,8 +3805,15 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             self.current = self.current + amount
             update_hand_text({delay = 0}, {[self.key] = self.current})
         end,
-        level_up_hand = function(self, amount, hand)
-            hand[self.key] = math.max(hand['s_'..self.key] + hand['l_'..self.key]*(hand.level - 1), 0)
+        level_up_hand = function(self, amount, hand, behaviour)
+            if type(behaviour) == "function" then
+                hand[self.key] = math.max(behaviour(hand[self.key], amount), 0)
+            else
+                if behaviour then
+                    print("Warning - non-function behaviour " .. behaviour .. " passed to " .. self.key .. " level_up_hand")
+                end
+                hand[self.key] = math.max(hand[self.key] + amount, 0)
+            end
         end,
         calc_effect = function(self, effect, scored_card, key, amount, from_edition)
             if not SMODS.Calculation_Controls[self.key] then return end
