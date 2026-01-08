@@ -604,6 +604,48 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     SMODS.Sound{ key = 'xchips', path = 'xchips.ogg'}
 
     -------------------------------------------------------------------------------------------------
+    ------- API CODE GameObject.Gradient
+    -------------------------------------------------------------------------------------------------
+
+    SMODS.Gradients = {}
+    SMODS.Gradient = SMODS.GameObject:extend {
+        obj_table = SMODS.Gradients,
+        obj_buffer = {},
+        required_params = { 'key' },
+        interpolation = 'trig',
+        cycle = 10,
+        colours = {},
+        inject = function(self) self[1], self[2], self[3], self[4] = 0,0,0,1 end,
+        update = function(self, dt)
+            if #self.colours < 2 then return end
+            local timer = G.TIMERS.REAL%self.cycle
+            local start_index = math.ceil(timer*#self.colours/self.cycle)
+            local end_index = start_index == #self.colours and 1 or start_index+1
+            local start_colour, end_colour = self.colours[start_index], self.colours[end_index]
+            local partial_timer = (timer%(self.cycle/#self.colours))*#self.colours/self.cycle
+            for i = 1, 4 do
+                if self.interpolation == 'linear' then
+
+                    self[i] = start_colour[i] + partial_timer*(end_colour[i]-start_colour[i])
+                elseif self.interpolation == 'trig' then
+                    self[i] = start_colour[i] + 0.5*(1-math.cos(partial_timer*math.pi))*(end_colour[i]-start_colour[i])
+                end
+            end
+        end,
+    }
+    SMODS.Gradient {
+        key = 'warning_bg',
+        colours = { G.C.RED, G.C.GREEN },
+        cycle = 1,
+    }
+    SMODS.Gradient {
+        key = 'warning_text',
+        colours = { G.C.WHITE, G.C.RED },
+        cycle = 1,
+    }
+
+
+    -------------------------------------------------------------------------------------------------
     ----- API CODE GameObject.Stake
     -------------------------------------------------------------------------------------------------
 
@@ -1197,7 +1239,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         rarity = 1,
         unlocked = true,
         discovered = false,
-        blueprint_compat = false,
+        blueprint_compat = true,
         perishable_compat = true,
         eternal_compat = true,
         pos = { x = 0, y = 0 },
@@ -3543,47 +3585,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     }
 
     -------------------------------------------------------------------------------------------------
-    ------- API CODE GameObject.Gradient
-    -------------------------------------------------------------------------------------------------
-
-    SMODS.Gradients = {}
-    SMODS.Gradient = SMODS.GameObject:extend {
-        obj_table = SMODS.Gradients,
-        obj_buffer = {},
-        required_params = { 'key' },
-        interpolation = 'trig',
-        cycle = 10,
-        colours = {},
-        inject = function(self) self[1], self[2], self[3], self[4] = 0,0,0,1 end,
-        update = function(self, dt)
-            if #self.colours < 2 then return end
-            local timer = G.TIMERS.REAL%self.cycle
-            local start_index = math.ceil(timer*#self.colours/self.cycle)
-            local end_index = start_index == #self.colours and 1 or start_index+1
-            local start_colour, end_colour = self.colours[start_index], self.colours[end_index]
-            local partial_timer = (timer%(self.cycle/#self.colours))*#self.colours/self.cycle
-            for i = 1, 4 do
-                if self.interpolation == 'linear' then
-
-                    self[i] = start_colour[i] + partial_timer*(end_colour[i]-start_colour[i])
-                elseif self.interpolation == 'trig' then
-                    self[i] = start_colour[i] + 0.5*(1-math.cos(partial_timer*math.pi))*(end_colour[i]-start_colour[i])
-                end
-            end
-        end,
-    }
-    SMODS.Gradient {
-        key = 'warning_bg',
-        colours = { G.C.RED, G.C.GREEN },
-        cycle = 1,
-    }
-    SMODS.Gradient {
-        key = 'warning_text',
-        colours = { G.C.WHITE, G.C.RED },
-        cycle = 1,
-    }
-
-    -------------------------------------------------------------------------------------------------
     ------- API CODE GameObject.Scoring_Calculation
     -------------------------------------------------------------------------------------------------
 
@@ -3622,8 +3623,15 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             self.current = self.current + amount
             update_hand_text({delay = 0}, {[self.key] = self.current})
         end,
-        level_up_hand = function(self, amount, hand)
-            hand[self.key] = math.max(hand['s_'..self.key] + hand['l_'..self.key]*(hand.level - 1), 0)
+        level_up_hand = function(self, amount, hand, behaviour)
+            if type(behaviour) == "function" then
+                hand[self.key] = math.max(behaviour(hand[self.key], amount), 0)
+            else
+                if behaviour then
+                    print("Warning - non-function behaviour " .. behaviour .. " passed to " .. self.key .. " level_up_hand")
+                end
+                hand[self.key] = math.max(hand[self.key] + amount, 0)
+            end
         end,
         calc_effect = function(self, effect, scored_card, key, amount, from_edition)
             if not SMODS.Calculation_Controls[self.key] then return end

@@ -517,7 +517,14 @@ function SMODS.applied_stakes_UI(i, stake_desc_rows, num_added)
 					local i = G.P_STAKES[v].stake_level
 					local _stake_desc = {}
 					local _stake_center = G.P_CENTER_POOLS.Stake[i]
-					localize { type = 'descriptions', key = _stake_center.key, set = _stake_center.set, nodes = _stake_desc }
+					local t, res = {}, {}
+					if _stake_center.loc_vars and type(_stake_center.loc_vars) == 'function' then
+						res = _stake_center:loc_vars() or {}
+					end
+					t.vars = res.vars or {}
+					t.key = res.key or _stake_center.key
+					t.set = res.set or _stake_center.set
+					localize { type = 'descriptions', key = t.key, set = t.set, nodes = _stake_desc, vars = t.vars }
 					local _full_desc = {}
 					for k, v in ipairs(_stake_desc) do
 						_full_desc[#_full_desc + 1] = {n = G.UIT.R, config = {align = "cm"}, nodes = v}
@@ -1499,7 +1506,7 @@ function Game:init_game_object()
             -- are fine.
             -- In fact, the check should just warn you if you have a key that
             -- can't be serialized.
-			if type(v) == 'number' or type(v) == 'boolean' or k == 'example' then
+			if type(v) == 'number' or type(v) == 'boolean' or k == 'example' or k == 'key' then
 				t.hands[key][k] = v
 			end
 		end
@@ -1909,7 +1916,7 @@ function create_UIBox_notify_alert(_achievement, _type)
     end
 
   if SMODS.Achievements[_achievement] then _c = SMODS.Achievements[_achievement]; _atlas = SMODS.get_atlas(_c.atlas) end
-  local t_s =  SMODS.create_sprite(0,0,1.5*(_atlas.px/_atlas.py),1.5, _atlas.key,  _c and _c.pos or {x=3, y=0})
+  local t_s =  SMODS.create_sprite(0,0,1.5*(_atlas.px/_atlas.py),1.5, _atlas.key or _atlas.name,  _c and _c.pos or {x=3, y=0})
 
   t_s.states.drag.can = false
   t_s.states.hover.can = false

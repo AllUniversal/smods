@@ -72,7 +72,7 @@ pattern = '''
 '''
 position = 'at'
 payload = '''
-local blind_sprite = SMODS.create_sprite(0, 0, 1.2, 1.2, G.ANIMATION_ATLAS[obj.atlas] or G.ANIMATION_ATLAS['blind_chips'], copy_table(G.GAME.blind.pos))
+local blind_sprite = SMODS.create_sprite(0, 0, 1.2, 1.2, obj.atlas or 'blind_chips', copy_table(G.GAME.blind.pos))
 '''
 match_indent = true
 [[patches]] 
