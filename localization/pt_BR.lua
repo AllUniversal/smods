@@ -62,7 +62,12 @@ return {
                     'Este mod foi',
                     '{C:attention}desabilitado!{}'
                 }
-            }
+            },
+            card_chips_minus = {
+                text = {
+                    '{C:chips}#1#{} fichas'
+                },
+            },
         },
         Edition = {
             e_negative_playing_card = {
@@ -100,7 +105,7 @@ return {
             b_authors = 'Autores',
             b_unknown = 'Desconhecido',
             b_lovely_mod = '(Mod do Lovely) ',
-            b_by = ' Por: ',
+            b_by = 'Por: ',
 			b_config = "Config.",
 			b_additions = 'Adições',
       		b_stickers = 'Adesivos',

@@ -136,6 +136,11 @@ return {
                     "{C:money}#1#{} если удерживается в конце раунда",
                 },
             },
+            card_chips_minus = {
+                text = {
+                    '{C:chips}#1#{} шт. фишек'
+                },
+            },
         },
         Edition = {
             e_negative_playing_card = {
@@ -196,7 +201,7 @@ return {
             b_authors = 'Авторы',
             b_unknown = 'Неизвестно',
             b_lovely_mod = '(Мод на Lovely) ',
-            b_by = ' От: ',
+            b_by = 'От: ',
             b_priority = 'Приоритет: ',
 			b_config = "Настройки",
 			b_additions = 'Нововведения',
