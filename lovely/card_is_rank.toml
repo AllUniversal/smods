@@ -104,7 +104,7 @@ pattern = '''
 position = "at"
 match_indent = false
 payload = '''
-                (context.other_card:is_ranks({10, 4}, false)) then'''
+                (context.other_card:is_ranks({["10"]=true, ["4"]=true}, false)) then'''
 
 
 # Fibonacci
@@ -128,7 +128,7 @@ position = "at"
 match_indent = true
 payload = '''
 if self.ability.name == 'Fibonacci' and (
-    context.other_card:is_ranks({2, 3, 5, 8, 14}, false)) then
+    context.other_card:is_ranks({["2"]=true, ["3"]=true, ["5"]=true, ["8"]=true, ["14"]=true}, false)) then
         return {
             mult = self.ability.extra,
             card = self
@@ -145,7 +145,7 @@ pattern = '''
 position = "at"
 match_indent = false
 payload = '''
-                    (context.other_card:is_ranks({12, 13}, false)) then'''
+                    (context.other_card:is_ranks({["12"]=true, ["13"]=true}, false)) then'''
 
 
 # Shoot the Moon
@@ -194,7 +194,7 @@ position = "at"
 match_indent = true
 payload = '''
 if self.ability.name == 'Hack' and (
-    context.other_card:is_ranks({2, 3, 4, 5}, false)) then
+    context.other_card:is_ranks({["2"]=true, ["3"]=true, ["4"]=true, ["5"]=true}, false)) then
         return {
             message = localize('k_again_ex'),
             repetitions = self.ability.extra,

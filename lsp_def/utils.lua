@@ -802,7 +802,7 @@ function SMODS.check_looping_context(eval_object) end
 ---@return boolean?
 function Card:is_rank(rank, bypass_debuff, flags) end
 
----@param ranks table<integer, SMODS.Rank|integer|string>|SMODS.Rank|integer|string A list of 'SMODS.Rank's or rank ids or rank keys (recommended) (or a singular one, but use Card:is_rank() instead)
+---@param ranks table<SMODS.Rank|integer|string, boolean>|SMODS.Rank|integer|string A map of 'SMODS.Rank's or rank ids or rank keys (recommended) (or a singular one, but use Card:is_rank() instead)
 ---@param bypass_debuff? boolean Whether the card being debuffed should be ignored
 ---@param flags? table The flags passed to Card:get_ranks() / SMODS.has_any_rank(). Useful for rank changing effects that should only apply for certain checks. (Read CalcContext eval_getting_ranks LSP def)
 ---@param all? boolean Whether the card needs to be all or just any of the ranks passed to the function.
@@ -815,6 +815,21 @@ function Card:get_ranks(flags) end
 ---@param parity integer The parity to be checked. (See SMODS.Rank lsp def)
 ---@return boolean
 function Card:is_parity(parity) end
+
+---@param conditions table<"rank"|"enhancement"|"seal"|"edition", table<>> The conditions the matcher should match for and their flags; All accept '{all = {map of values}}' or '{any = {map of values}}' to match a card matching all or any of a condition.
+---@return table<string, table> matcher A matcher is a table with conditions as keys and flags as values, e.g. '{enhancement = {any = {m_stone = true, m_lucky = true}}}' would be a matcher to match a card that is either stone or lucky. 
+function SMODS.create_card_matcher(conditions)
+
+---@param matcher table<string, table> See SMODS.create_card_matcher()
+---@param pcard Card The card to evaluate
+---@return boolean is_match
+function SMODS.matcher_evaluate_card(matcher, pcard)
+
+---@param cards table<integer, Card> The cards to match
+---@param matchers table<integer, table<string, table>> The matchers to match against, see SMODS.create_card_matcher()
+---@return table<table<string, table>, table<Card, boolean>> matchers_met_cards A map of matchers, with all the cards it matched as its value as a map too.
+---@return table<Card, table<table<string, table>, boolean>> cards_met_matchers The inverse of the above.
+function SMODS.match_cards(cards, matchers)
 
 ---@param t? table The list to turn into a map
 ---@return table

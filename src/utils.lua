@@ -1922,19 +1922,22 @@ end
 get_rank_objects = function(rank_map)
     local ret = {}
     for r, t in pairs(rank_map) do
-        local rank = nil
-        if type(r) == "string" then
-            rank = SMODS.Ranks[r]
-        elseif type(r) == "table" and r.key then
-            rank = SMODS.Ranks[r.key]
-        elseif type(r) == "number" then
-            rank = SMODS.get_rank_from_id(r)
-        end
+        local rank = get_rank_object(r)
         if rank then
             ret[rank] = t
         end
     end
     return ret
+end
+
+get_rank_object = function(rank)
+    if type(rank) == "string" then
+        return SMODS.Ranks[rank]
+    elseif type(rank) == "table" and rank.key then
+        return SMODS.Ranks[rank.key]
+    elseif type(rank) == "number" then
+        return SMODS.get_rank_from_id(rank)
+    end
 end
 
 
@@ -3044,7 +3047,7 @@ end
 
 function Card:is_ranks(ranks, bypass_debuff, flags, all)
     if not self.playing_card or not ranks then return false end
-    if type(ranks) ~= "table" or not ranks[1] then
+    if type(ranks) ~= "table" then
         ranks = {ranks}
     end
 
@@ -3052,8 +3055,8 @@ function Card:is_ranks(ranks, bypass_debuff, flags, all)
         if not self.vampired and SMODS.has_no_rank(self) then
             return false
         end
-        for _, rank in ipairs(ranks) do
-            if SMODS.Ranks[self.base.value] == rank or self.base.value == rank or self.base.id == rank then --Accepts SMODS.Rank or a rank key / id as input
+        for rank, _ in pairs(ranks) do
+            if SMODS.Ranks[self.base.value] == rank or self.base.value == rank or self.base.id == rank then -- Accepts SMODS.Rank or a rank key / id as input
                 return true
             end
         end
@@ -3061,11 +3064,11 @@ function Card:is_ranks(ranks, bypass_debuff, flags, all)
     end
 
     local is_wild = SMODS.has_any_rank(self)
-    if is_wild and (not all or #ranks < 2) then return true end
+    if is_wild and (not all or table_length(ranks) < 2) then return true end
 
     local rank_dict = {}
-    for _, v in ipairs(ranks) do
-        rank_dict[v] = true
+    for rank, _ in pairs(ranks) do
+        rank_dict[rank] = true
     end
 
     if not next(rank_dict) then return false end
@@ -3153,6 +3156,164 @@ function SMODS.lowest_and_highest_rank(cards)
         end
     end
     return {lowest = {rank = lowest.rank, cards = rank_to_cards[lowest.rank]}, highest = {rank = highest.rank, cards = rank_to_cards[highest.rank]}}
+end
+
+
+SMODS.card_matchers_conditions = {
+    rank = true, enhancement = true,
+    seal = true, edition = true
+}
+
+function SMODS.create_card_matcher(conditions)
+    local matcher = {}
+    for condition, flags in pairs(conditions) do
+        SMODS.insert_card_matcher_condition(matcher, condition, flags)
+    end
+    return matcher
+end
+
+local _matcher_insert_all_or_any = function(matcher, condition, subcondition, flags, obj_key_field)
+    if subcondition == "all" then
+        matcher[condition].all = {}
+        for obj, v in pairs(flags.all) do
+            if v then
+                local key = type(obj) == "string" and obj or obj[obj_key_field]
+                matcher[condition].all[key] = true
+            end
+        end
+    elseif subcondition == "any" then
+        matcher[condition].any = {}
+        for obj, v in pairs(flags.any) do
+            if v then
+                local key = type(obj) == "string" and obj or obj[obj_key_field]
+                matcher[condition].any[key] = true
+            end
+        end
+    end
+end
+function SMODS.insert_card_matcher_condition(matcher, condition, flags)
+    if condition == "rank" then
+        matcher.rank = {}
+        if flags.all then
+            _matcher_insert_all_or_any(matcher, "rank", "all", flags, "key")
+        elseif flags.any then
+            _matcher_insert_all_or_any(matcher, "rank", "any", flags, "key")
+        elseif flags.lower_than then
+            matcher.rank.lower_than = get_rank_object(flags.lower_than)
+        elseif flags.higher_than then
+            matcher.rank.higher_than = get_rank_object(flags.higher_than)
+        end
+    elseif condition == "enhancement" then
+        matcher.enhancement = {}
+        if flags.all then
+            _matcher_insert_all_or_any(matcher, "enhancement", "all", flags, "key")
+        elseif flags.any then
+            _matcher_insert_all_or_any(matcher, "enhancement", "any", flags, "key")
+        end
+    elseif condition == "seal" then
+        matcher.seal = {}
+        if flags.all then
+            _matcher_insert_all_or_any(matcher, "seal", "all", flags, "name")
+        elseif flags.any then
+            _matcher_insert_all_or_any(matcher, "seal", "any", flags, "name")
+        end
+    elseif condition == "edition" then
+        matcher.edition = {}
+        if flags.all then
+            _matcher_insert_all_or_any(matcher, "edition", "all", flags, "key")
+        elseif flags.any then
+            _matcher_insert_all_or_any(matcher, "edition", "any", flags, "key")
+        end
+    end
+    if matcher[condition] and flags.invert then
+        matcher[condition].invert = true
+    end
+end
+
+function SMODS.matcher_evaluate_card(matcher, pcard)
+    local is_match = true
+    for condition, v in pairs(SMODS.card_matchers_conditions) do
+        if matcher[condition] then
+            local partial_match = SMODS.matcher_partial_evaluate(matcher, pcard, condition)
+            if not partial_match then
+                return false
+            end
+        end
+    end
+    return is_match
+end
+
+function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
+    local partial_match = false
+    if condition == "rank" then
+        if matcher.rank.all then
+            partial_match = pcard:is_ranks(matcher.rank.all, false, {matcher_getting_ranks = {all = true}}, true)
+        elseif matcher.rank.any then
+            partial_match = pcard:is_ranks(matcher.rank.any, false, {matcher_getting_ranks = {any = true}}, false)
+        elseif matcher.rank.lower_than then
+            local sort_nominal = SMODS.lowest_and_highest_rank({pcard}).lowest.rank.sort_nominal
+            partial_match = sort_nominal < matcher.rank.lower_than.sort_nominal
+        elseif matcher.rank.higher_than then
+            local sort_nominal = SMODS.lowest_and_highest_rank({pcard}).highest.rank.sort_nominal
+            partial_match = sort_nominal < matcher.rank.higher_than.sort_nominal
+        end
+    elseif condition == "enhancement" then
+        if matcher.enhancement.all then
+            for key, _ in pairs(matcher.enhancement.all) do
+                partial_match = SMODS.has_enhancement(pcard, key)
+                if not partial_match then break end
+            end
+        elseif matcher.enhancement.any then
+            for key, _ in pairs(matcher.enhancement.any) do
+                partial_match = SMODS.has_enhancement(pcard, key)
+                if partial_match then break end
+            end
+        end
+    elseif condition == "seal" then
+        if matcher.seal.all then
+            for key, _ in pairs(matcher.seal.all) do
+                partial_match = pcard.seal == key
+                if not partial_match then break end
+            end
+        elseif matcher.seal.any then
+            for key, _ in pairs(matcher.seal.any) do
+                partial_match = pcard.seal == key
+                if partial_match then break end
+            end
+        end
+    elseif condition == "edition" then 
+        if matcher.edition.all then
+            for key, _ in pairs(matcher.edition.all) do
+                partial_match = pcard.edition.key == key
+                if not partial_match then break end
+            end
+        elseif matcher.edition.any then
+            for key, _ in pairs(matcher.edition.any) do
+                partial_match = pcard.edition.key == key
+                if partial_match then break end
+            end
+        end
+    end
+    if matcher[condition].invert then partial_match = not partial_match end
+    return partial_match
+end
+
+function SMODS.match_cards(cards, matchers)
+    local matchers_met_cards = {} -- {matcher 1 = {map of cards that met it}, matcher 2 = ...}
+    local cards_met_matchers = {} -- Inverse of the above
+    for i, matcher in ipairs(matchers) do
+        matchers_met_cards[matcher] = {}
+        for _, pcard in ipairs(cards) do
+            if i == 1 then
+                cards_met_matchers[pcard] = {}
+            end
+            if SMODS.matcher_evaluate_card(matcher, pcard) then
+                matchers_met_cards[matcher][pcard] = true
+                cards_met_matchers[pcard][matcher] = true
+            end
+        end
+    end
+    return matchers_met_cards, cards_met_matchers
 end
 
 -- Scoring Calculation API
