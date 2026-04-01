@@ -818,18 +818,23 @@ function Card:is_parity(parity) end
 
 ---@param conditions table<"rank"|"enhancement"|"seal"|"edition", table<>> The conditions the matcher should match for and their flags; All accept '{all = {map of values}}' or '{any = {map of values}}' to match a card matching all or any of a condition.
 ---@return table<string, table> matcher A matcher is a table with conditions as keys and flags as values, e.g. '{enhancement = {any = {m_stone = true, m_lucky = true}}}' would be a matcher to match a card that is either stone or lucky. 
-function SMODS.create_card_matcher(conditions)
+function SMODS.create_card_matcher(conditions) end
 
 ---@param matcher table<string, table> See SMODS.create_card_matcher()
 ---@param pcard Card The card to evaluate
 ---@return boolean is_match
-function SMODS.matcher_evaluate_card(matcher, pcard)
+function SMODS.matcher_evaluate_card(matcher, pcard) end
 
 ---@param cards table<integer, Card> The cards to match
 ---@param matchers table<integer, table<string, table>> The matchers to match against, see SMODS.create_card_matcher()
 ---@return table<table<string, table>, table<Card, boolean>> matchers_met_cards A map of matchers, with all the cards it matched as its value as a map too.
 ---@return table<Card, table<table<string, table>, boolean>> cards_met_matchers The inverse of the above.
-function SMODS.match_cards(cards, matchers)
+function SMODS.match_cards(cards, matchers) end
+
+---@param matchers_met_cards table<table<string, table>, table<Card, boolean>> A map of matchers indexing the cards each matched with.
+---@param cards_met_matchers table<Card, table<table<string, table>, boolean>> The inverse of the above.
+---@return table<integer, table> hand The list of valid hands (though only one is ever returned). 
+function SMODS.get_hand_from_matching(matchers_met_cards, cards_met_matchers) end
 
 ---@param t? table The list to turn into a map
 ---@return table
