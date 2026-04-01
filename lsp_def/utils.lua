@@ -836,6 +836,10 @@ function Card:is_parity(parity) end
 ---     flags:
 ---         "any" = {...}           -> same as "rank" but for editions (quantum editions are currently not supported)
 ---         "all" = {...}           -> same as "rank" but for editions (quantum editions are currently not supported)
+--- "suit":
+---     flags:
+---         "any" = {...}           -> same as "rank" but for suits
+---         "all" = {...}           -> same as "rank" but for suits
 --- "check_function":
 ---     flags = [function]          -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not
 ---@param conditions table<"rank"|"enhancement"|"seal"|"edition"|"check_function", table<>>

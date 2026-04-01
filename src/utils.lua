@@ -3245,6 +3245,13 @@ function SMODS.insert_card_matcher_condition(matcher, condition, flags)
         elseif flags.any then
             _matcher_insert_all_or_any(matcher, "edition", "any", flags, "key")
         end
+    elseif condition == "suit" then
+        matcher.suit = {}
+        if flags.all then
+            _matcher_insert_all_or_any(matcher, "suit", "all", flags, "key")
+        elseif flags.any then
+            _matcher_insert_all_or_any(matcher, "suit", "any", flags, "key")
+        end
     elseif condition == "check_function" then
         matcher.check_function = flags.check_function
     end
@@ -3311,6 +3318,18 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
         elseif matcher.edition.any then
             for key, _ in pairs(matcher.edition.any) do
                 partial_match = pcard.edition.key == key
+                if partial_match then break end
+            end
+        end
+    elseif condition == "suit" then
+        if matcher.suit.all then
+            for key, _ in pairs(matcher.suit.all) do
+                partial_match = pcard:is_suit(key, nil, true)
+                if not partial_match then break end
+            end
+        elseif matcher.suit.any then
+            for key, _ in pairs(matcher.suit.any) do
+                partial_match = pcard:is_suit(key, nil, true)
                 if partial_match then break end
             end
         end
