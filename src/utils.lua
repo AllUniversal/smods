@@ -1281,6 +1281,16 @@ SMODS.calculate_individual_effect = function(effect, scored_card, key, amount, f
         SMODS.mod_score({ add = amount, card = effect.message_card or effect.juice_card or scored_card or effect.card or effect.focus, effect = effect, from_edition = from_edition })
         return true
     end
+    if (key == 'xblind_size' or key == 'h_xblind_size' or key == 'x_blind_size' or key == 'h_x_blindsize' or key == 'xblindsize' or key == 'h_xblindsize' or key == 'x_blindsize' or key == 'h_x_blindsize') and amount ~= 1 then
+        if effect.card and effect.card ~= scored_card then juice_card(effect.card) end
+        SMODS.mod_blind_size({ mult = amount, card = effect.message_card or effect.juice_card or scored_card or effect.card or effect.focus, effect = effect, from_edition = from_edition })
+        return true
+    end
+    if (key == 'blind_size' or key == 'h_blind_size' or key == 'blindsize' or key == 'h_blindsize') and amount ~= 0 then
+        if effect.card and effect.card ~= scored_card then juice_card(effect.card) end
+        SMODS.mod_blind_size({ add = amount, card = effect.message_card or effect.juice_card or scored_card or effect.card or effect.focus, effect = effect, from_edition = from_edition })
+        return true
+    end
 
     if key == 'message' and not SMODS.no_resolve then
         if effect.card and effect.card ~= scored_card then juice_card(effect.card) end
@@ -1500,6 +1510,8 @@ SMODS.other_calculation_keys = {
     'p_dollars', 'dollars', 'h_dollars',
     'score', 'h_score',
     'xscore', 'x_score', 'h_x_score', 'h_xscore',
+    'blind_size', 'blindsize', 'h_blind_size',  'h_blindsize',
+    'xblind_size', 'x_blind_size', 'xblindsize', 'x_blindsize', 'h_x_blind_size', 'h_xblind_size',  'h_x_blindsize', 'h_xblindsize',
     'swap', 'balance',
     'saved', 'effect', 'remove',
     'debuff', 'prevent_debuff', 'debuff_text',
@@ -2176,20 +2188,22 @@ function SMODS.blueprint_effect(copier, copied_card, context)
     end
 end
 
-function SMODS.get_mods_scoring_targets()
+function SMODS.get_mods_scoring_targets(_context)
     local ret = {}
     for _, mod in ipairs(SMODS.mod_list) do
-        if mod.can_load and mod.calculate and type(mod.calculate) == "function" then
+        local func = type(_context) == "string" and _context or 'calculate'
+        if mod.can_load and type(mod[func]) == "function" then
             table.insert(ret, mod)
         end
     end
     return ret
 end
 
-function SMODS.get_stake_scoring_targets()
+function SMODS.get_stake_scoring_targets(_context)
     local ret = {}
     for _, stake in ipairs(G.GAME.applied_stakes or {}) do
-        if G.P_CENTER_POOLS.Stake[stake].calculate and type(G.P_CENTER_POOLS.Stake[stake].calculate) == "function" then
+        local func = type(_context) == "string" and _context or 'calculate'
+        if type(G.P_CENTER_POOLS.Stake[stake][func]) == "function" then
             table.insert(ret, G.P_CENTER_POOLS.Stake[stake])
         end
     end
@@ -2213,18 +2227,18 @@ function SMODS.get_card_areas(_type, _context)
     end
     if _type == 'individual' then
         local t = {
-            { object = G.GAME.selected_back, scored_card = G.deck.cards[1] or G.deck },
+            { object = G.GAME.selected_back, scored_card = G.deck.cards[1] or G.deck, set = 'Back', key = G.GAME.selected_back.effect.center.key },
         }
 
         if G.GAME.blind and G.GAME.blind.children and G.GAME.blind.children.animatedSprite then
-            t[#t + 1] = { object = G.GAME.blind, scored_card = G.GAME.blind.children.animatedSprite }
+            t[#t + 1] = { object = G.GAME.blind, scored_card = G.GAME.blind.children.animatedSprite, set = "Blind", key = G.GAME.blind.config.blind.key}
         end
-        if G.GAME.challenge then t[#t + 1] = { object = SMODS.Challenges[G.GAME.challenge], scored_card = G.deck.cards[1] or G.deck } end
-        for _, stake in ipairs(SMODS.get_stake_scoring_targets()) do
-            t[#t + 1] = { object = stake, scored_card = G.deck.cards[1] or G.deck }
+        if G.GAME.challenge then t[#t + 1] = { object = SMODS.Challenges[G.GAME.challenge], scored_card = G.deck.cards[1] or G.deck, set = "Challenge", key = SMODS.Challenges[G.GAME.challenge].id } end
+        for _, stake in ipairs(SMODS.get_stake_scoring_targets(_context)) do
+            t[#t + 1] = { object = stake, scored_card = G.deck.cards[1] or G.deck, set = "Stake", key = stake.key }
         end
-        for _, mod in ipairs(SMODS.get_mods_scoring_targets()) do
-            t[#t + 1] = { object = mod, scored_card = G.deck.cards[1] or G.deck }
+        for _, mod in ipairs(SMODS.get_mods_scoring_targets(_context)) do
+            t[#t + 1] = { object = mod, scored_card = G.deck.cards[1] or G.deck, set = "Mod", key = mod.id }
         end
         -- TARGET: add your own individual scoring targets
         return t
@@ -2239,6 +2253,19 @@ function Blind:calculate(context)
     local obj = self.config.blind
     if type(obj.calculate) == 'function' then
         return obj:calculate(self, context)
+    end
+end
+
+function Back:calc_dollar_bonus()
+    local obj = self.effect.center
+    if type(obj.calc_dollar_bonus) == 'function' then
+        return obj:calc_dollar_bonus(self)
+    end
+end
+function Blind:calc_dollar_bonus()
+    local obj = self.config.blind
+    if type(obj.calc_dollar_bonus) == 'function' then
+        return obj:calc_dollar_bonus(self)
     end
 end
 
@@ -3223,6 +3250,18 @@ function SMODS.localize_perma_bonuses(specific_vars, desc_nodes)
     if specific_vars and specific_vars.perma_h_x_score then
         localize{type = 'other', key = 'card_extra_h_x_score', nodes = desc_nodes, vars = {(specific_vars.perma_h_x_score)}}
     end
+    if specific_vars and specific_vars.perma_blind_size then
+        localize{type = 'other', key = 'card_extra_blind_size', nodes = desc_nodes, vars = {SMODS.signed(specific_vars.perma_blind_size)}}
+    end
+    if specific_vars and specific_vars.perma_h_blind_size then
+        localize{type = 'other', key = 'card_extra_h_blind_size', nodes = desc_nodes, vars = {SMODS.signed(specific_vars.perma_h_blind_size)}}
+    end
+    if specific_vars and specific_vars.perma_x_blind_size then
+        localize{type = 'other', key = 'card_extra_x_blind_size', nodes = desc_nodes, vars = {(specific_vars.perma_x_blind_size)}}
+    end
+    if specific_vars and specific_vars.perma_h_x_blind_size then
+        localize{type = 'other', key = 'card_extra_h_x_blind_size', nodes = desc_nodes, vars = {(specific_vars.perma_h_x_blind_size)}}
+    end
     if specific_vars and specific_vars.bonus_repetitions then
         localize{type = 'other', key = 'card_extra_repetitions', nodes = desc_nodes, vars = {specific_vars.bonus_repetitions, localize(specific_vars.bonus_repetitions > 1 and 'b_retrigger_plural' or 'b_retrigger_single')}}
     end
@@ -3612,7 +3651,8 @@ end
 
 -- Used for SMODS.ScreenShader, just to save lines re-creating canvases when relevant
 function SMODS.create_canvas()
-    local canvas = love.graphics.newCanvas(love.window.fromPixels(love.graphics.getWidth()) * G.CANV_SCALE, love.window.fromPixels(love.graphics.getHeight()) * G.CANV_SCALE, { type = '2d', readable = true })
+    local w, h = love.graphics.getPixelWidth(), love.graphics.getPixelHeight()
+    local canvas = love.graphics.newCanvas(w, h, { type = '2d', readable = true })
     canvas:setFilter('linear', 'linear')
     return canvas
 end
@@ -3676,6 +3716,143 @@ function SMODS.get_badge_text_colour(key)
         if k:lower()..'_seal' == key and v.text_colour then return v.text_colour end
     end
 end
+
+
+function SMODS.resolve_ui_shaders(shader, send)
+    local shaders = {}
+    -- simple single shader
+    if type(shader) == "string" then
+        shaders[#shaders+1] = { shader = shader, send = send }
+
+    -- more complex shader calls
+    elseif type(shader) == "table" then
+        -- one shader pass with a custom send
+        if shader.shader then
+            shaders[#shaders+1] = { shader = shader.shader, send = shader.send }
+
+        -- list of shaders
+        elseif #shader > 0 then
+            for _, v in ipairs(shader) do
+                if type(v) == "string" then
+                    shaders[#shaders+1] = { shader = v }
+                elseif type(v) == "table" then
+                    shaders[#shaders+1] = { shader = v.shader, send = v.send }
+                end
+            end
+        end
+    end
+    if #shaders == 0 then
+        return { { no_shader = true } }
+    end
+    return shaders
+end
+function SMODS.set_ui_element_shader(element, input_args)
+    input_args = input_args or {}
+    local can_apply = input_args.can_apply
+    local shader, send = input_args.shader, input_args.send
+    local default_send_func = input_args.default_send_func or function() end
+    local extra = input_args.extra or {}
+
+    local args = {
+        G.TIMERS.REAL/28,
+        G.TIMERS.REAL
+    }
+	local shadered = true
+    
+    if not can_apply or not shader or shader == "none" or shader == "dissolve" then
+        shadered = false
+	elseif send then
+		for _, v in ipairs(send) do
+			local val = v.val or (v.func and v.func(element, unpack(extra))) or v.ref_table[v.ref_value]
+			-- TARGET: SMODS.set_ui_element_shader - Convert val to a number if your mod adds an alternate number data type (ala Talisman)
+
+			G.SHADERS[shader]:send(v.name, val)
+		end
+	elseif shader == "vortex" then
+		G.SHADERS['vortex']:send('vortex_amt', G.TIMERS.REAL - (G.vortex_time or 0))
+	else
+		local key = SMODS.Shaders[shader].original_key
+		
+		G.SHADERS[shader]:send(key, args)
+        default_send_func(element, shader, unpack(extra))
+	end
+
+    if shadered then
+        local p_shader = SMODS.Shader.obj_table[shader or 'dissolve']
+        if p_shader and type(p_shader.send_vars) == "function" then
+            local sh = G.SHADERS[shader or 'dissolve']
+            local send_vars = p_shader.send_vars(element, unpack(extra))
+        
+            if type(send_vars) == "table" then
+                for key, value in pairs(send_vars) do
+                    sh:send(key, value)
+                end
+            end
+        end
+
+		element.shadered = true
+        love.graphics.setShader(G.SHADERS[shader], G.SHADERS[shader])
+    else
+        if element.shadered then love.graphics.setShader() end
+        element.shadered = nil
+    end
+end
+
+function DynaText:set_letter_shader(shader, send, shadow, letter)
+    SMODS.set_ui_element_shader(self, {
+        can_apply = self.states.visible and letter,
+        shader = shader,
+        send = send,
+        extra = { shadow, letter },
+        default_send_func = function(element, shader, shadow, letter)
+            local tile_scale = G.TILESCALE*G.TILESIZE*G.CANV_SCALE
+            local _shadow_norm = (not shadow) and element.ARGS.draw_shadow_norm or {x=0, y=0}
+
+            local letter_x, letter_y = 0.5*(letter.dims.x - letter.offset.x)*element.font.FONTSCALE/G.TILESIZE + _shadow_norm.x,
+                0.5*(letter.dims.y - letter.offset.y)*element.font.FONTSCALE/G.TILESIZE + _shadow_norm.y
+            
+            G.SHADERS[shader]:send("text_details", {element.T.x * tile_scale, element.T.y * tile_scale, element.T.w * tile_scale, element.T.h * tile_scale})
+            G.SHADERS[shader]:send("text_scale", element.scale)
+            G.SHADERS[shader]:send("text_rot", element.T.r)
+            G.SHADERS[shader]:send("letter_details", {letter_x, letter_y, letter.dims.x * tile_scale, letter.dims.y * tile_scale})
+            G.SHADERS[shader]:send("letter_scale", letter.scale)
+            G.SHADERS[shader]:send("letter_rot", letter.r)
+            G.SHADERS[shader]:send("text_shadow", not not shadow)
+        end
+    })
+end
+function UIElement:set_element_shader(shader, send, shadow)
+    SMODS.set_ui_element_shader(self, {
+        can_apply = self.states.visible,
+        shader = shader,
+        send = send,
+        extra = { shadow },
+        default_send_func = function(element, shader, shadow)
+            local tile_scale = G.TILESCALE*G.TILESIZE*G.CANV_SCALE
+
+            G.SHADERS[shader]:send("uie_details", {element.VT.x * tile_scale, element.VT.y * tile_scale, element.VT.w * tile_scale, element.VT.h * tile_scale})
+            G.SHADERS[shader]:send("uie_scale", element.VT.scale)
+            G.SHADERS[shader]:send("uie_rot", element.VT.r)
+        end
+    })
+end
+function UIElement:set_text_shader(shader, send, shadow)
+    SMODS.set_ui_element_shader(self, {
+        can_apply = self.states.visible,
+        shader = shader,
+        send = send,
+        extra = { shadow },
+        default_send_func = function(element, shader, shadow)
+            local tile_scale = G.TILESCALE*G.TILESIZE*G.CANV_SCALE
+
+            G.SHADERS[shader]:send("text_details", {element.VT.x * tile_scale, element.VT.y * tile_scale, element.VT.w * tile_scale, element.VT.h * tile_scale})
+            G.SHADERS[shader]:send("text_scale", element.VT.scale)
+            G.SHADERS[shader]:send("text_rot", element.VT.r)
+            G.SHADERS[shader]:send("text_shadow", not not shadow)
+        end
+    })
+end
+
 -- function to modify score: normally accepts add and mult argument and additionally card argument
 SMODS.mod_score = function(score_mod)
     score_mod = score_mod or {}
@@ -3691,7 +3868,6 @@ SMODS.mod_score = function(score_mod)
         score_fx[#score_fx+1] = {key = score_mod.mult < 0 and "a_xscore_minus" or "a_xscore", value = absoluted, sound = "xscore", message_key = "xscore_message"}
     end
     if score_mod.add and score_mod.add ~= 0 then
-        local absoluted = math.abs(score_mod.add)
         score_cal = score_cal + score_mod.add
         table.insert(G.SCORE_DISPLAY_QUEUE, old)
         score_fx[#score_fx+1] = { key = "a_score", value = score_mod.add, sound = "gong", message_key = 'score_message'}
@@ -3718,4 +3894,52 @@ SMODS.mod_score = function(score_mod)
         score_mod.effect.update_score = true
     end
     delay(0.2)
+end
+
+-- function to modify blind score: normally accepts add and mult argument and additionally card argument
+SMODS.mod_blind_size = function(blind_size_mod)
+    blind_size_mod = blind_size_mod or {}
+    local blind_size_fx = {}
+    local blind_size_cal = blind_size_mod.set or G.GAME.blind.chips
+    local old = G.GAME.blind.chips
+    G.BLIND_SIZE_DISPLAY_QUEUE = G.BLIND_SIZE_DISPLAY_QUEUE or {}
+    -- TARGET: higher priority score operation
+    if blind_size_mod.mult then
+        local absoluted = math.abs(blind_size_mod.mult)
+        blind_size_cal = blind_size_cal * blind_size_mod.mult
+        table.insert(G.BLIND_SIZE_DISPLAY_QUEUE, blind_size_cal)
+        blind_size_fx[#blind_size_fx+1] = {key = blind_size_mod.mult < 0 and "a_xblind_size_minus" or "a_xblind_size", value = absoluted, sound = "xblindsize", message_key = "xblind_size_message"}
+    end
+    if blind_size_mod.add and blind_size_mod.add ~= 0 then
+        blind_size_cal = blind_size_cal + blind_size_mod.add
+        table.insert(G.BLIND_SIZE_DISPLAY_QUEUE, blind_size_cal)
+        blind_size_fx[#blind_size_fx+1] = { key = "a_blind_size", value = blind_size_mod.add, sound = "timpani", message_key = 'blind_size_message'}
+    end
+    -- TARGET: lower priority blind_size operation
+    G.GAME.blind.chips = blind_size_cal
+
+    if not (blind_size_mod.effect and blind_size_mod.effect.remove_default_message) and blind_size_mod.card then
+        for _,v in ipairs(blind_size_fx) do
+            if blind_size_mod.from_edition then
+                card_eval_status_text(blind_size_mod.card, 'jokers', nil, percent, nil, {message = localize{type = 'variable', key = v.key, vars = {v.value}}, update_blind_size = true, colour = G.C.EDITION, edition = true, sound = v.sound, volume = 0.5 })
+            elseif blind_size_mod.effect and blind_size_mod.effect[v.message_key] then
+                blind_size_mod.effect[v.message_key].update_blind_size = true
+                card_eval_status_text(blind_size_mod.card, 'extra', v.value, percent, nil, blind_size_mod.effect[v.message_key])
+            else
+                card_eval_status_text(blind_size_mod.card, 'jokers', nil, percent, nil, {message = localize{type='variable',key= v.key,vars={v.value}}, update_blind_size = true, volume = 0.5, sound_override = v.sound, colour = G.C.DYN_UI.DARK}) -- or use G.C.UI.FILTER
+            end
+        end 
+        -- this check is in case some skip animation mods is there, may be removed in the future
+        if G.CARD_EVAL_TRIGGERED then
+            G.BLIND_SIZE_DISPLAY_QUEUE = nil
+        end
+    elseif blind_size_mod.effect then
+        blind_size_mod.effect.update_blind_size = true
+    end
+    delay(0.2)
+end
+
+-- Simple unlock text function, created to give mod authors an option to hook rather than patch for their use cases.
+function SMODS.create_unlock_text(center)
+	return localize('k_'..string.lower(center and center.set or 'unknown'))
 end
