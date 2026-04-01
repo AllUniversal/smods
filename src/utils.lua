@@ -3185,12 +3185,6 @@ function SMODS.lowest_and_highest_rank(cards)
     return {lowest = {rank = lowest.rank, cards = rank_to_cards[lowest.rank]}, highest = {rank = highest.rank, cards = rank_to_cards[highest.rank]}}
 end
 
-
-SMODS.card_matchers_conditions = {
-    rank = true, enhancement = true,
-    seal = true, edition = true
-}
-
 function SMODS.create_card_matcher(conditions)
     local matcher = {}
     for condition, flags in pairs(conditions) do
@@ -3259,12 +3253,10 @@ end
 
 function SMODS.matcher_evaluate_card(matcher, pcard)
     local is_match = true
-    for condition, v in pairs(SMODS.card_matchers_conditions) do
-        if matcher[condition] then
-            local partial_match = SMODS.matcher_partial_evaluate(matcher, pcard, condition)
-            if not partial_match then
-                return false
-            end
+    for condition, _ in pairs(matcher) do
+        local partial_match = SMODS.matcher_partial_evaluate(matcher, pcard, condition)
+        if not partial_match then
+            return false
         end
     end
     return is_match
@@ -3341,6 +3333,69 @@ function SMODS.match_cards(cards, matchers)
         end
     end
     return matchers_met_cards, cards_met_matchers
+end
+
+function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, deduplicate_matches, all_matched_cards_score)
+    deduplicate_matches = deduplicate_matches == nil or deduplicate_matches -- Defaults to true
+    local matcher_n = table_length(matchers_to_cards)
+    local card_n = table_length(cards_to_matchers)
+    if matcher_n > card_n then
+        return {} 
+    end
+    for matcher, pcards in pairs(matchers_to_cards) do
+        if not next(pcards) then
+            return {}
+        end
+    end
+    if not deduplicate_matches then -- Yay this is simple
+        local hand = {}
+        for pcard, matchers in pairs(cards_to_matchers) do
+            if next(matchers) then 
+                hand[#hand+1] = pcard
+            end
+        end
+        return {hand}
+    end
+
+    -- Recursive bipartite matching function
+    local bpm
+    bpm = function(matcher, c_to_m, used_c)
+        for pcard, _ in pairs(matchers_to_cards[matcher]) do
+            if not used_c[pcard] then
+                used_c[pcard] = true
+                if not c_to_m[pcard] or bpm(c_to_m[pcard], c_to_m, used_c) then
+                    c_to_m[pcard] = matcher
+                    return true
+                end
+            end
+        end
+    end
+
+    local used_cards = {}
+    local card_to_matcher = {}
+    local count = 0
+    for matcher, _ in pairs(matchers_to_cards) do
+        used_cards = {}
+        if bpm(matcher, card_to_matcher, used_cards) then
+            count = count + 1
+        end
+    end
+    if count == matcher_n then
+        local hand = {}
+        if all_matched_cards_score then -- Every matcher has a unique card, but all cards that matched any matcher should still score
+            for pcard, matchers in pairs(cards_to_matchers) do
+                if next(matchers) then 
+                    hand[#hand+1] = pcard
+                end
+            end
+        else
+            for pcard, _ in pairs(card_to_matcher) do
+                hand[#hand+1] = pcard
+            end
+        end
+        return {hand}
+    end
+    return {}
 end
 
 -- Scoring Calculation API
