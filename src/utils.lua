@@ -3245,6 +3245,8 @@ function SMODS.insert_card_matcher_condition(matcher, condition, flags)
         elseif flags.any then
             _matcher_insert_all_or_any(matcher, "edition", "any", flags, "key")
         end
+    elseif condition == "check_function" then
+        matcher.check_function = flags.check_function
     end
     if matcher[condition] and flags.invert then
         matcher[condition].invert = true
@@ -3312,6 +3314,8 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
                 if partial_match then break end
             end
         end
+    elseif condition == "check_function" then
+        partial_match = matcher.check_function(pcard, matcher)
     end
     if matcher[condition].invert then partial_match = not partial_match end
     return partial_match
