@@ -781,10 +781,8 @@ function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 --- Conditions: (format {[condition] = {flags}, [condition 2] = ...})
 --- "rank":
 ---     flags: 
----         "any" = {...}           -> map of rank objects, keys or ids, matcher matches if the card is any of them
----         "all" = {...}           -> ^ same but only matches if the card is all of them
----         "lower_than" = [float]  -> matcher matches for whether the .sort_nominal of the card's lowest rank is lower than the flag value
----         "higher_than" = [float] -> matcher matches for whether the .sort_nominal of the card's highest rank is higher than the flag value
+---         "any" = {...}           -> map of rank objects, keys or ids, matcher matches if the card is any of them (quantum ranks are currently not supported)
+---         "all" = {...}           -> ^ same but only matches if the card is all of them (quantum ranks are currently not supported)
 --- "enhancement":
 ---     flags:
 ---         "any" = {...}           -> same as "rank" but for enhancements
@@ -803,7 +801,7 @@ function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 ---         "all" = {...}           -> same as "rank" but for suits
 --- "check_function":
 ---     flags = [function]          -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not
----@param conditions table<"rank"|"enhancement"|"seal"|"edition"|"check_function", table<>>
+---@param conditions table<"rank"|"enhancement"|"seal"|"edition"|"check_function", table<string, table>|function>
 ---@return table<string, table> matcher A matcher is a table with conditions as keys and flags as values, e.g. '{enhancement = {any = {m_stone = true, m_lucky = true}}}' would be a matcher to match a card that is either stone or lucky. 
 function SMODS.create_card_matcher(conditions) end
 

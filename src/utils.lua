@@ -4088,10 +4088,6 @@ function SMODS.insert_card_matcher_condition(matcher, condition, flags)
             _matcher_insert_all_or_any(matcher, "rank", "all", flags, "key")
         elseif flags.any then
             _matcher_insert_all_or_any(matcher, "rank", "any", flags, "key")
-        elseif flags.lower_than then
-            matcher.rank.lower_than = get_rank_object(flags.lower_than)
-        elseif flags.higher_than then
-            matcher.rank.higher_than = get_rank_object(flags.higher_than)
         end
     elseif condition == "enhancement" then
         matcher.enhancement = {}
@@ -4144,15 +4140,15 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     local partial_match = false
     if condition == "rank" then
         if matcher.rank.all then
-            partial_match = pcard:is_ranks(matcher.rank.all, false, {matcher_getting_ranks = {all = true}}, true)
+            for key, _ in pairs(matcher.rank.all) do
+                partial_match = pcard.base.value == key
+                if not partial_match then break end
+            end
         elseif matcher.rank.any then
-            partial_match = pcard:is_ranks(matcher.rank.any, false, {matcher_getting_ranks = {any = true}}, false)
-        elseif matcher.rank.lower_than then
-            local sort_nominal = SMODS.lowest_and_highest_rank({pcard}).lowest.rank.sort_nominal
-            partial_match = sort_nominal < matcher.rank.lower_than.sort_nominal
-        elseif matcher.rank.higher_than then
-            local sort_nominal = SMODS.lowest_and_highest_rank({pcard}).highest.rank.sort_nominal
-            partial_match = sort_nominal < matcher.rank.higher_than.sort_nominal
+            for key, _ in pairs(matcher.rank.any) do
+                partial_match = pcard.base.value == key
+                if partial_match then break end
+            end
         end
     elseif condition == "enhancement" then
         if matcher.enhancement.all then
