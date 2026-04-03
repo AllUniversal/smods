@@ -4161,7 +4161,7 @@ local _matcher_evaluate_count = function(matcher, pcard, condition)
         is_match = _matcher_evaluate_count_subflags(matcher.edition.count, matcher._pre_count.edition[key])
     elseif condition == "suit" then
         if not SMODS.has_no_suit(pcard) then
-            for suit, _ in pcard:get_suits() do
+            for suit, _ in pairs(pcard:get_suits()) do
                 is_match = _matcher_evaluate_count_subflags(matcher.suit.count, matcher._pre_count.suit[suit])
                 if is_match then break end
             end
