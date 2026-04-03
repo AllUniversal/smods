@@ -4333,6 +4333,7 @@ function SMODS.match_cards(cards, matchers)
 end
 
 function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, args)
+    args = args or {}
     args.deduplicate_matches = args.deduplicate_matches == nil or args.deduplicate_matches -- Defaults to true
     local matcher_n = table_length(matchers_to_cards)
     local card_n = table_length(cards_to_matchers)
