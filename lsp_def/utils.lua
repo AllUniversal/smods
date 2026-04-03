@@ -779,28 +779,17 @@ function SMODS.get_atlas_sprite_class(atlas_key) end
 function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 
 --- Conditions: (format {[condition] = {flags}, [condition 2] = ...})
---- "rank":
----     flags: 
----         "any" = {...}           -> map of rank objects, keys or ids, matcher matches if the card is any of them (quantum ranks are currently not supported)
----         "all" = {...}           -> ^ same but only matches if the card is all of them (quantum ranks are currently not supported)
---- "enhancement":
----     flags:
----         "any" = {...}           -> same as "rank" but for enhancements
----         "all" = {...}           -> same as "rank" but for enhancements
---- "seal":
----     flags:
----         "any" = {...}           -> same as "rank" but for seals (quantum seals are currently not supported)
----         "all" = {...}           -> same as "rank" but for seals (quantum seals are currently not supported)
---- "edition":
----     flags:
----         "any" = {...}           -> same as "rank" but for editions (quantum editions are currently not supported)
----         "all" = {...}           -> same as "rank" but for editions (quantum editions are currently not supported)
---- "suit":
----     flags:
----         "any" = {...}           -> same as "rank" but for suits
----         "all" = {...}           -> same as "rank" but for suits
---- "check_function":
----     flags = [function]          -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not
+--- Shared flags (all conditions support these):
+---     "any" = {...}           -> map of keys, matcher matches if the card is/has any of them (quantum ranks/seals/editions are currently not supported)
+---     "all" = {...}           -> ^ same but only matches if the card is all of them (quantum ranks/seals/editions are currently not supported)
+---     "count" = {...}         -> "count" has the following subflags;
+---             "exact" = integer       -> The exact number of cards that must share a card's property, e.g. its enhancement, for the matcher to match a card.
+---             "at_least" = integer    -> The minimum number of cards ...^
+---             "at_most" = integer     -> The maximum number of cards ...^
+---             "func" = function       -> A function, which is called with the total number of cards that share a card's property (^), expecting a boolean return value to determine whether it matches or not. -> e.g. is_even() check or similar
+--- Unique flags:
+--- "check_function" condition:
+---     flags = [function]      -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not
 ---@param conditions table<"rank"|"enhancement"|"seal"|"edition"|"check_function", table<string, table>|function>
 ---@return table<string, table> matcher A matcher is a table with conditions as keys and flags as values, e.g. '{enhancement = {any = {m_stone = true, m_lucky = true}}}' would be a matcher to match a card that is either stone or lucky. 
 function SMODS.create_card_matcher(conditions) end
