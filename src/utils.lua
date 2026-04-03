@@ -4100,6 +4100,7 @@ function SMODS.insert_card_matcher_condition(matcher, condition, flags)
         seal = true,
         edition = true,
         suit = true,
+        check_function = true,
     }
     if not whitelist[condition] then return false end
     if condition == "check_function" then
