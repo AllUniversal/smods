@@ -819,8 +819,10 @@ function SMODS.match_cards(cards, matchers) end
 
 ---@param matchers_met_cards table<table<string, table>, table<Card, boolean>> A map of matchers indexing the cards each matched with.
 ---@param cards_met_matchers table<Card, table<table<string, table>, boolean>> The inverse of the above.
+---@param deduplicate_matches boolean Whether to make sure that each matcher matches a unique card.
+---@param all_matched_cards_score boolean In addition to the above; As long as every matcher has at least one unique card, all cards that matched any matcher should score. (-> Akin to how Straight Flushes with Four Fingers work.)
 ---@return table<integer, table> hand The list of valid hands (though only one is ever returned). 
-function SMODS.get_hand_from_matching(matchers_met_cards, cards_met_matchers) end
+function SMODS.get_hand_from_matching(matchers_met_cards, cards_met_matchers, deduplicate_matches, all_matched_cards_score) end
 
 ---@param key string The key or name of the Blind to check
 ---@param ignore_disabled? boolean Whether to ignore the Blind being disabled
