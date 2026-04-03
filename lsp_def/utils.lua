@@ -823,6 +823,7 @@ function SMODS.match_cards(cards, matchers) end
 ---@param args table<"deduplicate_matches"|"all_matched_cards_score", boolean> Args;
 ---     "deduplicate_matches": Whether to make sure that each matcher matches a unique card. 
 ---     "all_matched_cards_score": In addition; As long as every matcher has at least one unique card, all cards that matched any matcher should score. (-> Akin to how Straight Flushes with Four Fingers work.)
+---     "matcher_max_cards": A table<matcher, integer> allowing a matcher to count for more than one card, without needing to calculate it twice.
 ---@return table<integer, table> hand The list of valid hands (though only one is ever returned). 
 function SMODS.get_hand_from_matching(matchers_met_cards, cards_met_matchers, args) end
 

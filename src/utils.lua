@@ -4345,6 +4345,18 @@ end
 function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, args)
     args = args or {}
     args.deduplicate_matches = args.deduplicate_matches == nil or args.deduplicate_matches -- Defaults to true
+    if args.matcher_max_cards then -- This duplicates matchers so that they may take up more than one card in the final hand.
+        for matcher, max in pairs(args.matcher_max_cards) do
+            while max > 1 do
+                max = max - 1
+                local dummy = {} -- None of the actual matcher fields are needed anymore
+                matchers_to_cards[dummy] = matchers_to_cards[matcher]
+                for pcard, _ in pairs(matchers_to_cards[matcher]) do
+                    cards_to_matchers[pcard][dummy] = true
+                end
+            end
+        end
+    end
     local matcher_n = table_length(matchers_to_cards)
     local card_n = table_length(cards_to_matchers)
     if args.deduplicate_matches and matcher_n > card_n then
