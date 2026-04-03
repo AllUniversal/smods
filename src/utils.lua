@@ -4123,7 +4123,7 @@ function SMODS.insert_card_matcher_condition(matcher, condition, flags)
     return true
 end
 
-local _nil_sentinel = "--NONE--"
+SMODS.card_matcher_nil_sentinel = "--NONE--"
 
 local _matcher_evaluate_count_subflags = function(count_flag, total)
     local is_match = true
@@ -4144,20 +4144,20 @@ end
 local _matcher_evaluate_count = function(matcher, pcard, condition)
     local is_match = true
     if condition == "rank" then
-        local key = SMODS.has_no_rank(pcard) and _nil_sentinel or pcard.base.value
+        local key = SMODS.has_no_rank(pcard) and SMODS.card_matcher_nil_sentinel or pcard.base.value
         is_match = _matcher_evaluate_count_subflags(matcher.rank.count, matcher._pre_count.rank[key])
     elseif condition == "enhancement" then
         local enhs = SMODS.get_enhancements(pcard)
-        if not next(enhs) then enhs = {[_nil_sentinel] = true} end
+        if not next(enhs) then enhs = {[SMODS.card_matcher_nil_sentinel] = true} end
         for enh, _ in pairs(enhs) do
             is_match = _matcher_evaluate_count_subflags(matcher.enhancement.count, matcher._pre_count.enhancement[enh])
             if is_match then break end -- If the card has quantum enhancements, as long as ANY enhancement meets the count criteria, the card matches.
         end
     elseif condition == "seal" then
-        local key = pcard.seal or _nil_sentinel
+        local key = pcard.seal or SMODS.card_matcher_nil_sentinel
         is_match = _matcher_evaluate_count_subflags(matcher.seal.count, matcher._pre_count.seal[key])
     elseif condition == "edition" then
-        local key = pcard.edition and pcard.edition.key or _nil_sentinel
+        local key = pcard.edition and pcard.edition.key or SMODS.card_matcher_nil_sentinel
         is_match = _matcher_evaluate_count_subflags(matcher.edition.count, matcher._pre_count.edition[key])
     elseif condition == "suit" then
         if not SMODS.has_no_suit(pcard) then
@@ -4166,7 +4166,7 @@ local _matcher_evaluate_count = function(matcher, pcard, condition)
                 if is_match then break end
             end
         else
-            is_match = _matcher_evaluate_count_subflags(matcher.suit.count, matcher._pre_count.suit[_nil_sentinel])
+            is_match = _matcher_evaluate_count_subflags(matcher.suit.count, matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel])
         end
     end
     return is_match
@@ -4186,7 +4186,7 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     if condition == "rank" then
         if matcher.rank.all then
             for key, _ in pairs(matcher.rank.all) do
-                if key == _nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
+                if key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
                 else partial_match = pcard.base.value == key end
                 if not partial_match then break end
             end
@@ -4194,7 +4194,7 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
         end
         if matcher.rank.any then
             for key, _ in pairs(matcher.rank.any) do
-                if partial_match and key == _nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
+                if partial_match and key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
                 else partial_match = pcard.base.value == key end
                 if partial_match then break end
             end
@@ -4203,7 +4203,7 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     elseif condition == "enhancement" then
         if matcher.enhancement.all then
             for key, _ in pairs(matcher.enhancement.all) do
-                if key == _nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
+                if key == SMODS.card_matcher_nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
                 else partial_match = SMODS.has_enhancement(pcard, key) end
                 if not partial_match then break end
             end
@@ -4211,7 +4211,7 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
         end
         if matcher.enhancement.any then
             for key, _ in pairs(matcher.enhancement.any) do
-                if key == _nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
+                if key == SMODS.card_matcher_nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
                 else partial_match = SMODS.has_enhancement(pcard, key) end
                 if partial_match then break end
             end
@@ -4220,14 +4220,14 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     elseif condition == "seal" then
         if matcher.seal.all then
             for key, _ in pairs(matcher.seal.all) do
-                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == _nil_sentinel)
+                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == SMODS.card_matcher_nil_sentinel)
                 if not partial_match then break end
             end
             if not partial_match then goto skip end
         end
         if matcher.seal.any then
             for key, _ in pairs(matcher.seal.any) do
-                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == _nil_sentinel)
+                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == SMODS.card_matcher_nil_sentinel)
                 if partial_match then break end
             end
             if not partial_match then goto skip end
@@ -4235,14 +4235,14 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     elseif condition == "edition" then 
         if matcher.edition.all then
             for key, _ in pairs(matcher.edition.all) do
-                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == _nil_sentinel)
+                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == SMODS.card_matcher_nil_sentinel)
                 if not partial_match then break end
             end
             if not partial_match then goto skip end
         end
         if matcher.edition.any then
             for key, _ in pairs(matcher.edition.any) do
-                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == _nil_sentinel)
+                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == SMODS.card_matcher_nil_sentinel)
                 if partial_match then break end
             end
             if not partial_match then goto skip end
@@ -4250,7 +4250,7 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     elseif condition == "suit" then
         if matcher.suit.all then
             for key, _ in pairs(matcher.suit.all) do
-                if key == _nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
+                if key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
                 else partial_match = pcard:is_suit(key, nil, true) end
                 if not partial_match then break end
             end
@@ -4258,7 +4258,7 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
         end
         if matcher.suit.any then
             for key, _ in pairs(matcher.suit.any) do
-                if key == _nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
+                if key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
                 else partial_match = pcard:is_suit(key, nil, true) end
                 if partial_match then break end
             end
@@ -4277,19 +4277,19 @@ end
 
 local _matcher_count_condition = function(matcher, condition, pcard)
     if condition == "rank" then
-        local key = SMODS.has_no_rank(pcard) and _nil_sentinel or pcard.base.value
+        local key = SMODS.has_no_rank(pcard) and SMODS.card_matcher_nil_sentinel or pcard.base.value
         matcher._pre_count.rank[key] = matcher._pre_count.rank[key] and matcher._pre_count.rank[key] + 1 or 1 
     elseif condition == "enhancement" then
         local enhs = SMODS.get_enhancements(pcard)
-        if not next(enhs) then enhs = {[_nil_sentinel] = true} end
+        if not next(enhs) then enhs = {[SMODS.card_matcher_nil_sentinel] = true} end
         for enh, _ in pairs(enhs) do
             matcher._pre_count.enhancement[enh] = matcher._pre_count.enhancement[enh] and matcher._pre_count.enhancement[enh] + 1 or 1 
         end
     elseif condition == "seal" then
-        local key = pcard.seal or _nil_sentinel
+        local key = pcard.seal or SMODS.card_matcher_nil_sentinel
         matcher._pre_count.seal[key] = matcher._pre_count.seal[key] and matcher._pre_count.seal[key] + 1 or 1 
     elseif condition == "edition" then 
-        local key = pcard.edition and pcard.edition.key or _nil_sentinel
+        local key = pcard.edition and pcard.edition.key or SMODS.card_matcher_nil_sentinel
         matcher._pre_count.edition[key] = matcher._pre_count.edition[key] and matcher._pre_count.edition[key] + 1 or 1 
     elseif condition == "suit" then
         if not SMODS.has_no_suit(pcard) then
@@ -4297,7 +4297,7 @@ local _matcher_count_condition = function(matcher, condition, pcard)
                 matcher._pre_count.suit[suit] = matcher._pre_count.suit[suit] and matcher._pre_count.suit[suit] + 1 or 1 
             end
         else
-            matcher._pre_count.suit[_nil_sentinel] = matcher._pre_count.suit[_nil_sentinel] and matcher._pre_count.suit[_nil_sentinel] + 1 or 1 
+            matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel] = matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel] and matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel] + 1 or 1 
         end
     end
 end
@@ -4331,6 +4331,11 @@ function SMODS.match_cards(cards, matchers)
     end
     return matchers_met_cards, cards_met_matchers
 end
+
+local matchers = {
+    SMODS.create_card_matcher({seal = {any = {Red = true}}})
+}
+SMODS.get_hand_from_matching(SMODS.match_cards(G.hand.cards, matchers), true, true)
 
 function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, deduplicate_matches, all_matched_cards_score)
     deduplicate_matches = deduplicate_matches == nil or deduplicate_matches -- Defaults to true
