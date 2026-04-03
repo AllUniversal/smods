@@ -787,6 +787,7 @@ function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 ---             "at_least" = integer    -> The minimum number of cards ...^
 ---             "at_most" = integer     -> The maximum number of cards ...^
 ---             "func" = function       -> A function, which is called with the total number of cards that share a card's property (^), expecting a boolean return value to determine whether it matches or not. -> e.g. is_even() check or similar
+---             "any_related" = boolean -> Whether to count a matched card's property as all of the property keys of the "any" flag. -> This allows matching cards based on the number of cards that share any of the "any" values, instead of specifically the card's property value.
 --- Unique flags:
 --- "check_function" condition:
 ---     flags = [function]      -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not

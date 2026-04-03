@@ -4089,6 +4089,8 @@ local _matcher_insert_count = function(matcher, condition, subflags)
             matcher[condition].count.at_most = v
         elseif flag == "func" then
             matcher[condition].count.func = v
+        elseif flag == "any_related" then
+            matcher[condition].count.any_related = v
         end
     end
 end
@@ -4276,28 +4278,34 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
 end
 
 local _matcher_count_condition = function(matcher, condition, pcard)
+    local values
     if condition == "rank" then
-        local key = SMODS.has_no_rank(pcard) and SMODS.card_matcher_nil_sentinel or pcard.base.value
-        matcher._pre_count.rank[key] = matcher._pre_count.rank[key] and matcher._pre_count.rank[key] + 1 or 1 
+        values = {[SMODS.has_no_rank(pcard) and SMODS.card_matcher_nil_sentinel or pcard.base.value] = true}
     elseif condition == "enhancement" then
-        local enhs = SMODS.get_enhancements(pcard)
-        if not next(enhs) then enhs = {[SMODS.card_matcher_nil_sentinel] = true} end
-        for enh, _ in pairs(enhs) do
-            matcher._pre_count.enhancement[enh] = matcher._pre_count.enhancement[enh] and matcher._pre_count.enhancement[enh] + 1 or 1 
-        end
+        values = SMODS.get_enhancements(pcard)
+        if not next(values) then values = {[SMODS.card_matcher_nil_sentinel] = true} end
     elseif condition == "seal" then
-        local key = pcard.seal or SMODS.card_matcher_nil_sentinel
-        matcher._pre_count.seal[key] = matcher._pre_count.seal[key] and matcher._pre_count.seal[key] + 1 or 1 
+        values = {[pcard.seal or SMODS.card_matcher_nil_sentinel] = true}
     elseif condition == "edition" then 
-        local key = pcard.edition and pcard.edition.key or SMODS.card_matcher_nil_sentinel
-        matcher._pre_count.edition[key] = matcher._pre_count.edition[key] and matcher._pre_count.edition[key] + 1 or 1 
+        values = {[pcard.edition and pcard.edition.key or SMODS.card_matcher_nil_sentinel] = true}
     elseif condition == "suit" then
         if not SMODS.has_no_suit(pcard) then
-            for suit, _ in pcard:get_suits() do
-                matcher._pre_count.suit[suit] = matcher._pre_count.suit[suit] and matcher._pre_count.suit[suit] + 1 or 1 
-            end
+            values = pcard:get_suits()
         else
-            matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel] = matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel] and matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel] + 1 or 1 
+            values = {[SMODS.card_matcher_nil_sentinel] = true}
+        end
+    end
+    local propagate_to = matcher[condition].count.any_related and matcher[condition].any
+    local propagated_to_any = false
+    for key, _ in pairs(values) do
+        matcher._pre_count[condition][key] = matcher._pre_count[condition][key] and matcher._pre_count[condition][key] + 1 or 1
+        if not propagated_to_any and propagate_to and propagate_to[key] then -- If it hasn't propagated, it should propagate (count is any_related and there's an "any" flag) and the card has a property value that matches the "any" flag
+            propagated_to_any = true
+            for p_key, v in pairs(propagate_to) do
+                if v and p_key ~= key then
+                    matcher._pre_count[condition][p_key] = matcher._pre_count[condition][p_key] and matcher._pre_count[condition][p_key] + 1 or 1
+                end
+            end
         end
     end
 end
