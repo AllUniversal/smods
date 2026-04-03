@@ -4131,6 +4131,8 @@ function SMODS.matcher_evaluate_card(matcher, pcard)
     return true
 end
 
+local _nil_sentinel = "--NONE--"
+
 function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     local partial_match = false 
     if matcher[condition].count and (not matcher.deferred_count or not matcher.deferred_count[condition]) then
@@ -4140,128 +4142,155 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
     if condition == "rank" then
         if matcher.rank.all then
             for key, _ in pairs(matcher.rank.all) do
-                partial_match = pcard.base.value == key
+                if key == _nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
+                else partial_match = pcard.base.value == key end
                 if not partial_match then break end
             end
         end
         if matcher.rank.any then
             for key, _ in pairs(matcher.rank.any) do
-                partial_match = pcard.base.value == key
+                if key == _nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
+                else partial_match = pcard.base.value == key end
                 if partial_match then break end
             end
         end
         if matcher.rank.count then
-            matcher.deferred_count.rank[pcard.base.value] = matcher.deferred_count.rank[pcard.base.value] and matcher.deferred_count.rank[pcard.base.value] + 1 or 1 
+            local key = SMODS.has_no_rank(pcard) and _nil_sentinel or pcard.base.value
+            matcher.deferred_count.rank[key] = matcher.deferred_count.rank[key] and matcher.deferred_count.rank[key] + 1 or 1 
         end
     elseif condition == "enhancement" then
         if matcher.enhancement.all then
             for key, _ in pairs(matcher.enhancement.all) do
-                partial_match = SMODS.has_enhancement(pcard, key)
+                if key == _nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
+                else partial_match = SMODS.has_enhancement(pcard, key) end
                 if not partial_match then break end
             end
         end
         if matcher.enhancement.any then
             for key, _ in pairs(matcher.enhancement.any) do
-                partial_match = SMODS.has_enhancement(pcard, key)
+                if key == _nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
+                else partial_match = SMODS.has_enhancement(pcard, key) end
                 if partial_match then break end
             end
         end
         if matcher.enhancement.count then
-            for enh, _ in SMODS.get_enhancements(pcard) do
+            local enhs = SMODS.get_enhancements(pcard)
+            if not next(enhs) then enhs = {[_nil_sentinel] = true} end
+            for enh, _ in pairs(enhs) do
                 matcher.deferred_count.enhancement[enh] = matcher.deferred_count.enhancement[enh] and matcher.deferred_count.enhancement[enh] + 1 or 1 
             end
         end
     elseif condition == "seal" then
         if matcher.seal.all then
             for key, _ in pairs(matcher.seal.all) do
-                partial_match = pcard.seal == key
+                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == _nil_sentinel)
                 if not partial_match then break end
             end
         end
         if matcher.seal.any then
             for key, _ in pairs(matcher.seal.any) do
-                partial_match = pcard.seal == key
+                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == _nil_sentinel)
                 if partial_match then break end
             end
         end
         if matcher.seal.count then
-            matcher.deferred_count.seal[pcard.seal] = matcher.deferred_count.seal[pcard.seal] and matcher.deferred_count.seal[pcard.seal] + 1 or 1 
+            local key = pcard.seal or _nil_sentinel
+            matcher.deferred_count.seal[key] = matcher.deferred_count.seal[key] and matcher.deferred_count.seal[key] + 1 or 1 
         end
     elseif condition == "edition" then 
         if matcher.edition.all then
             for key, _ in pairs(matcher.edition.all) do
-                partial_match = pcard.edition.key == key
+                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == _nil_sentinel)
                 if not partial_match then break end
             end
         end
         if matcher.edition.any then
             for key, _ in pairs(matcher.edition.any) do
-                partial_match = pcard.edition.key == key
+                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == _nil_sentinel)
                 if partial_match then break end
             end
         end
         if matcher.edition.count then
-            matcher.deferred_count.edition[pcard.edition.key] = matcher.deferred_count.edition[pcard.edition.key] and matcher.deferred_count.edition[pcard.edition.key] + 1 or 1 
+            local key = pcard.edition and pcard.edition.key or _nil_sentinel
+            matcher.deferred_count.edition[key] = matcher.deferred_count.edition[key] and matcher.deferred_count.edition[key] + 1 or 1 
         end
     elseif condition == "suit" then
         if matcher.suit.all then
             for key, _ in pairs(matcher.suit.all) do
-                partial_match = pcard:is_suit(key, nil, true)
+                if key == _nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
+                else partial_match = pcard:is_suit(key, nil, true) end
                 if not partial_match then break end
             end
         end
         if matcher.suit.any then
             for key, _ in pairs(matcher.suit.any) do
-                partial_match = pcard:is_suit(key, nil, true)
+                if key == _nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
+                else partial_match = pcard:is_suit(key, nil, true) end
                 if partial_match then break end
             end
         end
         if matcher.suit.count then
-            for suit, _ in pcard:get_suits() do
-                matcher.deferred_count.suit[suit] = matcher.deferred_count.suit[suit] and matcher.deferred_count.suit[suit] + 1 or 1 
+            if not SMODS.has_no_suit(pcard) then
+                for suit, _ in pcard:get_suits() do
+                    matcher.deferred_count.suit[suit] = matcher.deferred_count.suit[suit] and matcher.deferred_count.suit[suit] + 1 or 1 
+                end
+            else
+                matcher.deferred_count.suit[_nil_sentinel] = matcher.deferred_count.suit[_nil_sentinel] and matcher.deferred_count.suit[_nil_sentinel] + 1 or 1 
             end
         end
     elseif condition == "check_function" then
         partial_match = matcher.check_function(pcard, matcher)
     end
-    if matcher[condition].invert then partial_match = not partial_match end
+    if not matcher[condition].count and matcher[condition].invert then partial_match = not partial_match end
     return partial_match
 end
 
 
-local _matcher_evaluate_count_subflags = function(matcher, total)
+local _matcher_evaluate_count_subflags = function(count_flag, total)
     local is_match = true
-    if matcher.count.exact then
-        is_match = is_match and total == matcher.count.exact
+    if count_flag.exact then
+        print("exact = ", total)
+        is_match = is_match and total == count_flag.exact
     end
-    if matcher.count.at_least then
-        is_match = is_match and total >= matcher.count.at_least
+    if count_flag.at_least then
+        print("at least = ", total)
+        is_match = is_match and total >= count_flag.at_least
     end
-    if matcher.count.at_most then
-        is_match = is_match and total <= matcher.count.at_most
+    if count_flag.at_most then
+        print("at most = ", total)
+        is_match = is_match and total <= count_flag.at_most
     end
-    if matcher.count.func then
-        is_match = is_match and matcher.count.func(total)
+    if count_flag.func then
+        is_match = is_match and count_flag.func(total)
     end
     return is_match
 end
 local _matcher_evaluate_deferred_count = function(matcher, pcard, condition, counts)
     local is_match = true
     if condition == "rank" then
-        is_match = _matcher_evaluate_count_subflags(matcher, counts[pcard.base.value])
+        local key = SMODS.has_no_rank(pcard) and _nil_sentinel or pcard.base.value
+        is_match = _matcher_evaluate_count_subflags(matcher.rank.count, counts[key])
     elseif condition == "enhancement" then
-        for enh, _ in SMODS.get_enhancements(pcard) do
-            is_match = _matcher_evaluate_count_subflags(matcher, counts[enh])
+        local enhs = SMODS.get_enhancements(pcard)
+        if not next(enhs) then enhs = {[_nil_sentinel] = true} end
+        for enh, _ in pairs(enhs) do
+            is_match = _matcher_evaluate_count_subflags(matcher.enhancement.count, counts[enh])
             if is_match then break end -- If the card has quantum enhancements, as long as ANY enhancement meets the count criteria, the card matches.
         end
     elseif condition == "seal" then
-        is_match = _matcher_evaluate_count_subflags(matcher, counts[pcard.seal])
-    elseif condition == "edition" then 
-        is_match = _matcher_evaluate_count_subflags(matcher, counts[pcard.edition.key])
+        local key = pcard.seal or _nil_sentinel
+        is_match = _matcher_evaluate_count_subflags(matcher.seal.count, counts[key])
+    elseif condition == "edition" then
+        local key = pcard.edition and pcard.edition.key or _nil_sentinel
+        is_match = _matcher_evaluate_count_subflags(matcher.edition.count, counts[key])
     elseif condition == "suit" then
-        for suit, _ in pcard:get_suits() do
-            is_match = _matcher_evaluate_count_subflags(matcher, counts[suit])
-            if is_match then break end
+        if not SMODS.has_no_suit(pcard) then
+            for suit, _ in pcard:get_suits() do
+                is_match = _matcher_evaluate_count_subflags(matcher.suit.count, counts[suit])
+                if is_match then break end
+            end
+        else
+            is_match = _matcher_evaluate_count_subflags(matcher.suit.count, counts[_nil_sentinel])
         end
     end
     return is_match
@@ -4285,7 +4314,10 @@ function SMODS.match_cards(cards, matchers)
         if matcher.deferred_count then
             for _, pcard in ipairs(cards) do
                 for condition, counts in pairs(matcher.deferred_count) do
-                    local matched = _matcher_evaluate_deferred_count(matcher, pcard, condition, counts)
+                    local matched = matchers_met_cards[matcher][pcard]
+                    if matched then
+                        matched = _matcher_evaluate_deferred_count(matcher, pcard, condition, counts)
+                    end
                     if matcher[condition].invert then matched = not matched end
                     if matched then
                         matchers_met_cards[matcher][pcard] = true
@@ -4366,8 +4398,9 @@ end
 
 function Card:get_suits(bypass_debuff, flush_calc)
     local ret = {}
+    local is_wild = SMODS.has_any_suit(self)
     for suit, _ in pairs(SMODS.Suits) do
-        if self:is_suit(suit, bypass_debuff, flush_calc) then
+        if is_wild or self:is_suit(suit, bypass_debuff, flush_calc) then
             ret[suit] = true
         end
     end
