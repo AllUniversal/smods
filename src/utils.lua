@@ -4336,7 +4336,7 @@ function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, dedu
     deduplicate_matches = deduplicate_matches == nil or deduplicate_matches -- Defaults to true
     local matcher_n = table_length(matchers_to_cards)
     local card_n = table_length(cards_to_matchers)
-    if matcher_n > card_n then
+    if deduplicate_matches and matcher_n > card_n then
         return {} 
     end
     for matcher, pcards in pairs(matchers_to_cards) do
