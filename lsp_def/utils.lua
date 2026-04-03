@@ -790,9 +790,21 @@ function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 --- Unique flags:
 --- "check_function" condition:
 ---     flags = [function]      -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not
----@param conditions table<"rank"|"enhancement"|"seal"|"edition"|"check_function", table<string, table>|function>
+---@param conditions table<"rank"|"enhancement"|"seal"|"edition"|"suit"|"check_function", table<string, table>|function>
 ---@return table<string, table> matcher A matcher is a table with conditions as keys and flags as values, e.g. '{enhancement = {any = {m_stone = true, m_lucky = true}}}' would be a matcher to match a card that is either stone or lucky. 
 function SMODS.create_card_matcher(conditions) end
+
+--- Internal function for creating a card matcher, hooking this and SMODS.matcher_partial_evaluate() allows adding new conditions.
+---@param matcher table<string, table> See SMODS.create_card_matcher()
+---@param condition string See SMODS.create_card_matcher()
+---@param flags table See SMODS.create_card_matcher()
+function SMODS.insert_card_matcher_condition(matcher, condition, flags) end
+
+--- Internal function for checking if a matcher matches a card, hooking this and SMODS.insert_card_matcher_condition() allows adding new conditions.
+---@param matcher table<string, table> The matcher to evaluate, see SMODS.create_card_matcher()
+---@param pcard Card The card to evaluate
+---@param condition string See SMODS.create_card_matcher()
+function SMODS.matcher_partial_evaluate(matcher, pcard, condition) end
 
 ---@param matcher table<string, table> See SMODS.create_card_matcher()
 ---@param pcard Card The card to evaluate
