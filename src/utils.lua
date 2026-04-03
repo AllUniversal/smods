@@ -4298,7 +4298,9 @@ local _matcher_count_condition = function(matcher, condition, pcard)
     local propagate_to = matcher[condition].count.any_related and matcher[condition].any
     local propagated_to_any = false
     for key, _ in pairs(values) do
-        matcher._pre_count[condition][key] = matcher._pre_count[condition][key] and matcher._pre_count[condition][key] + 1 or 1
+        if not propagated_to_any or not propagate_to[key] then -- Prevent double counting in case of multi-valued card properties, e.g. quantum enhancements.
+            matcher._pre_count[condition][key] = matcher._pre_count[condition][key] and matcher._pre_count[condition][key] + 1 or 1
+        end
         if not propagated_to_any and propagate_to and propagate_to[key] then -- If it hasn't propagated, it should propagate (count is any_related and there's an "any" flag) and the card has a property value that matches the "any" flag
             propagated_to_any = true
             for p_key, v in pairs(propagate_to) do
