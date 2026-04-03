@@ -4307,7 +4307,6 @@ function SMODS.match_cards(cards, matchers)
     local deferred_matchers = {} -- Map of matchers which require deferred matching, due to e.g. the .count subcondition
     -- Precalculate conditions like .count, so that all conditions can be correctly partially matched at once.
     for i, matcher in ipairs(matchers) do
-        matchers_met_cards[matcher] = {}
         for condition, flags in pairs(matcher) do
             if flags.count then
                 matcher._pre_count = matcher._pre_count or {}
@@ -4319,6 +4318,7 @@ function SMODS.match_cards(cards, matchers)
         end
     end
     for i, matcher in ipairs(matchers) do
+        matchers_met_cards[matcher] = {}
         for _, pcard in ipairs(cards) do
             if i == 1 then
                 cards_met_matchers[pcard] = {}
