@@ -4332,16 +4332,11 @@ function SMODS.match_cards(cards, matchers)
     return matchers_met_cards, cards_met_matchers
 end
 
-local matchers = {
-    SMODS.create_card_matcher({seal = {any = {Red = true}}})
-}
-SMODS.get_hand_from_matching(SMODS.match_cards(G.hand.cards, matchers), true, true)
-
-function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, deduplicate_matches, all_matched_cards_score)
-    deduplicate_matches = deduplicate_matches == nil or deduplicate_matches -- Defaults to true
+function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, args)
+    args.deduplicate_matches = args.deduplicate_matches == nil or args.deduplicate_matches -- Defaults to true
     local matcher_n = table_length(matchers_to_cards)
     local card_n = table_length(cards_to_matchers)
-    if deduplicate_matches and matcher_n > card_n then
+    if args.deduplicate_matches and matcher_n > card_n then
         return {} 
     end
     for matcher, pcards in pairs(matchers_to_cards) do
@@ -4349,7 +4344,7 @@ function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, dedu
             return {}
         end
     end
-    if not deduplicate_matches then -- Yay this is simple
+    if not args.deduplicate_matches then -- Yay this is simple
         local hand = {}
         for pcard, matchers in pairs(cards_to_matchers) do
             if next(matchers) then 
@@ -4384,7 +4379,7 @@ function SMODS.get_hand_from_matching(matchers_to_cards, cards_to_matchers, dedu
     end
     if count == matcher_n then
         local hand = {}
-        if all_matched_cards_score then -- Every matcher has a unique card, but all cards that matched any matcher should still score
+        if args.all_matched_cards_score then -- Every matcher has a unique card, but all cards that matched any matcher should still score
             for pcard, matchers in pairs(cards_to_matchers) do
                 if next(matchers) then 
                     hand[#hand+1] = pcard
