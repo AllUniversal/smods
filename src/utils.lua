@@ -4293,7 +4293,7 @@ local _matcher_count_condition = function(matcher, condition, pcard)
         matcher._pre_count.edition[key] = matcher._pre_count.edition[key] and matcher._pre_count.edition[key] + 1 or 1 
     elseif condition == "suit" then
         if not SMODS.has_no_suit(pcard) then
-            for suit, _ in pcard:get_suits() do
+            for suit, _ in pairs(pcard:get_suits()) do
                 matcher._pre_count.suit[suit] = matcher._pre_count.suit[suit] and matcher._pre_count.suit[suit] + 1 or 1 
             end
         else
