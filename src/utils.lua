@@ -4140,7 +4140,7 @@ local _matcher_evaluate_count_subflags = function(count_flag, total)
     end
     return is_match
 end
-local _matcher_evaluate_pre_count = function(matcher, pcard, condition)
+local _matcher_evaluate_count = function(matcher, pcard, condition)
     local is_match = true
     if condition == "rank" then
         local key = SMODS.has_no_rank(pcard) and _nil_sentinel or pcard.base.value
@@ -4267,7 +4267,7 @@ function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
         partial_match = matcher.check_function(pcard, matcher)
     end
     if matcher[condition].count then
-        partial_match = _matcher_evaluate_pre_count(matcher, pcard, condition)
+        partial_match = _matcher_evaluate_count(matcher, pcard, condition)
     end
     ::skip::
     if matcher[condition].invert then partial_match = not partial_match end
