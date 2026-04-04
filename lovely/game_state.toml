@@ -124,3 +124,40 @@ elseif not SMODS.GameStates[G.STATE] then
     G.STATE = prev_state
 end
 '''
+
+# functions/button_callbacks.lua : G.FUNCS.end_consumeable() : update logic
+[[patches]]
+[patches.pattern]
+target = 'functions/button_callbacks.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+if G.shop and G.shop.alignment.offset.py then 
+    G.shop.alignment.offset.y = G.shop.alignment.offset.py
+    G.shop.alignment.offset.py = nil
+end
+if G.blind_select and G.blind_select.alignment.offset.py then
+    G.blind_select.alignment.offset.y = G.blind_select.alignment.offset.py
+    G.blind_select.alignment.offset.py = nil
+end
+if G.round_eval and G.round_eval.alignment.offset.py then
+    G.round_eval.alignment.offset.y = G.round_eval.alignment.offset.py
+    G.round_eval.alignment.offset.py = nil
+end
+'''
+payload = '''
+
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/button_callbacks.lua'
+match_indent = true
+position = 'at'
+pattern = '''G.STATE = G.GAME.PACK_INTERRUPT'''
+payload = '''
+if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].exit_after_end_consumable then
+    SMODS.exit_state(nil, nil, {state_override=G.GAME.PACK_INTERRUPT})
+elseif not SMODS.GameStates[G.STATE] then
+    G.STATE = G.GAME.PACK_INTERRUPT
+end
+'''
