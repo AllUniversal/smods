@@ -1292,7 +1292,7 @@ SMODS.calculate_individual_effect = function(effect, scored_card, key, amount, f
         SMODS.calculate_context({
             money_altered = true,
             amount = amount,
-            from_shop = (G.STATE == G.STATES.SHOP or G.STATE == SMODS.STATES.BOOSTER_OPENED or G.STATE == SMODS.STATES.REDEEM_VOUCHER) or nil,
+            from_shop = (G.STATE == SMODS.STATES.SHOP or G.STATE == SMODS.STATES.BOOSTER_OPENED or G.STATE == SMODS.STATES.REDEEM_VOUCHER) or nil,
             from_consumeable = (G.STATE == G.STATES.PLAY_TAROT) or nil,
             from_scoring = (G.STATE == G.STATES.HAND_PLAYED) or nil,
         })
@@ -3314,7 +3314,7 @@ function ease_dollars(mod, instant)
     SMODS.calculate_context({
         money_altered = true,
         amount = mod,
-        from_shop = (G.STATE == G.STATES.SHOP or G.STATE == SMODS.STATES.BOOSTER_OPENED or G.STATE == SMODS.STATES.REDEEM_VOUCHER) or nil,
+        from_shop = (G.STATE == SMODS.STATES.SHOP or G.STATE == SMODS.STATES.BOOSTER_OPENED or G.STATE == SMODS.STATES.REDEEM_VOUCHER) or nil,
         from_consumeable = (G.STATE == G.STATES.PLAY_TAROT) or nil,
         from_scoring = (G.STATE == G.STATES.HAND_PLAYED) or nil,
     })
