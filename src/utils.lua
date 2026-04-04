@@ -4061,20 +4061,17 @@ function SMODS.create_card_matcher(conditions)
     return matcher
 end
 
-local _matcher_insert_all_or_any = function(matcher, condition, subcondition, flags)
-    if subcondition == "all" then
-        matcher[condition].all = {}
-        for obj_key, v in pairs(flags.all) do
-            if v then
-                matcher[condition].all[obj_key] = true
-            end
-        end
-    elseif subcondition == "any" then
-        matcher[condition].any = {}
-        for obj_key, v in pairs(flags.any) do
-            if v then
-                matcher[condition].any[obj_key] = true
-            end
+local _general_insert_all_any_or_none = function(_table, subcondition, flags)
+    local whitelist = { 
+        all = true, 
+        any = true, 
+        none = true
+    }
+    if not whitelist[subcondition] then return end
+    _table[subcondition] = {}
+    for obj_key, v in pairs(flags[subcondition]) do
+        if v then
+            _table[subcondition][obj_key] = true
         end
     end
 end
@@ -4091,6 +4088,17 @@ local _matcher_insert_count = function(matcher, condition, subflags)
             matcher[condition].count.func = v
         elseif flag == "any_related" then
             matcher[condition].count.any_related = v
+        elseif flag == "overlap" then
+            matcher[condition].count.overlap = {}
+            if v.all then
+                _general_insert_all_any_or_none(matcher[condition].count.overlap, "all", v)
+            end
+            if v.any then
+                _general_insert_all_any_or_none(matcher[condition].count.overlap, "any", v)
+            end
+            if v.none then
+                _general_insert_all_any_or_none(matcher[condition].count.overlap, "none", v)
+            end
         end
     end
 end
@@ -4111,10 +4119,13 @@ function SMODS.insert_card_matcher_condition(matcher, condition, flags)
     end
     matcher[condition] = {}
     if flags.all then
-        _matcher_insert_all_or_any(matcher, condition, "all", flags)
+        _general_insert_all_any_or_none(matcher[condition], "all", flags)
     end
     if flags.any then
-        _matcher_insert_all_or_any(matcher, condition, "any", flags)
+        _general_insert_all_any_or_none(matcher[condition], "any", flags)
+    end
+    if flags.none then
+        _general_insert_all_any_or_none(matcher[condition], "none", flags)
     end
     if flags.count then
         _matcher_insert_count(matcher, condition, flags.count)
@@ -4143,32 +4154,104 @@ local _matcher_evaluate_count_subflags = function(count_flag, total)
     end
     return is_match
 end
-local _matcher_evaluate_count = function(matcher, pcard, condition)
-    local is_match = true
+local _matcher_get_card_condition_values = function(pcard, condition)
+    local keys
     if condition == "rank" then
-        local key = SMODS.has_no_rank(pcard) and SMODS.card_matcher_nil_sentinel or pcard.base.value
-        is_match = _matcher_evaluate_count_subflags(matcher.rank.count, matcher._pre_count.rank[key])
+        keys = {[SMODS.has_no_rank(pcard) and SMODS.card_matcher_nil_sentinel or pcard.base.value] = true}
     elseif condition == "enhancement" then
-        local enhs = SMODS.get_enhancements(pcard)
-        if not next(enhs) then enhs = {[SMODS.card_matcher_nil_sentinel] = true} end
-        for enh, _ in pairs(enhs) do
-            is_match = _matcher_evaluate_count_subflags(matcher.enhancement.count, matcher._pre_count.enhancement[enh])
-            if is_match then break end -- If the card has quantum enhancements, as long as ANY enhancement meets the count criteria, the card matches.
-        end
+        keys = SMODS.get_enhancements(pcard)
+        if not next(keys) then keys = {[SMODS.card_matcher_nil_sentinel] = true} end
     elseif condition == "seal" then
-        local key = pcard.seal or SMODS.card_matcher_nil_sentinel
-        is_match = _matcher_evaluate_count_subflags(matcher.seal.count, matcher._pre_count.seal[key])
+        keys = {[pcard.seal or SMODS.card_matcher_nil_sentinel] = true}
     elseif condition == "edition" then
-        local key = pcard.edition and pcard.edition.key or SMODS.card_matcher_nil_sentinel
-        is_match = _matcher_evaluate_count_subflags(matcher.edition.count, matcher._pre_count.edition[key])
+        keys = {[pcard.edition and pcard.edition.key or SMODS.card_matcher_nil_sentinel] = true}
     elseif condition == "suit" then
         if not SMODS.has_no_suit(pcard) then
-            for suit, _ in pairs(pcard:get_suits()) do
-                is_match = _matcher_evaluate_count_subflags(matcher.suit.count, matcher._pre_count.suit[suit])
-                if is_match then break end
-            end
+            keys = pcard:get_suits()
         else
-            is_match = _matcher_evaluate_count_subflags(matcher.suit.count, matcher._pre_count.suit[SMODS.card_matcher_nil_sentinel])
+            keys = {[SMODS.card_matcher_nil_sentinel] = true}
+        end
+    end
+    return keys
+end
+local _matcher_evaluate_card_overlap = function(pcard_values, other_card_values)
+    for p_value, v in pairs(pcard_values) do
+        if v and other_card_values[p_value] then
+            return true
+        end
+    end
+    return false
+end
+local _matcher_evaluate_count_overlap_subflag = function(matcher, condition, pcard, property_value)
+    local overlap_flag = matcher[condition].count.overlap
+    local successful_overlaps = 1 -- Counting the pcard itself too
+    if overlap_flag.all then
+        local failed_cards = {}
+        local total_cards = {}
+        for other_condition, _ in pairs(overlap_flag.all) do
+            local pcard_values
+            if other_condition ~= condition then
+                pcard_values = _matcher_get_card_condition_values(pcard, other_condition)
+            end
+            for other_card, v in pairs(matcher._pre_count[condition][property_value]) do
+                if other_card ~= pcard and not failed_cards[other_card] then
+                    total_cards[other_card] = true
+                    if not (other_condition == condition or _matcher_evaluate_card_overlap(pcard_values, _matcher_get_card_condition_values(other_card, other_condition))) then
+                        failed_cards[other_card] = true
+                    end
+                end
+            end
+        end
+        successful_overlaps = successful_overlaps + table_length(total_cards) - table_length(failed_cards)
+    end
+    if overlap_flag.any then
+        local successful_cards = {}
+        for other_condition, _ in pairs(overlap_flag.any) do
+            local pcard_values
+            if other_condition ~= condition then
+                pcard_values = _matcher_get_card_condition_values(pcard, other_condition)
+            end
+            for other_card, v in pairs(matcher._pre_count[condition][property_value]) do
+                if other_card ~= pcard and not successful_cards[other_card] then
+                    if other_condition == condition or _matcher_evaluate_card_overlap(pcard_values, _matcher_get_card_condition_values(other_card, other_condition)) then
+                        successful_cards[other_card] = true 
+                    end
+                end
+            end
+        end
+        successful_overlaps = successful_overlaps +  table_length(successful_cards)
+    end
+    if overlap_flag.none then
+        local failed_cards = {}
+        local total_cards = {}
+        for other_condition, _ in pairs(overlap_flag.none) do
+            local pcard_values
+            if other_condition ~= condition then
+                pcard_values = _matcher_get_card_condition_values(pcard, other_condition)
+            end
+            for other_card, v in pairs(matcher._pre_count[condition][property_value]) do
+                if other_card ~= pcard and not failed_cards[other_card] then
+                    total_cards[other_card] = true
+                    if other_condition == condition or _matcher_evaluate_card_overlap(pcard_values, _matcher_get_card_condition_values(other_card, other_condition)) then
+                        failed_cards[other_card] = true
+                    end
+                end
+            end
+        end
+        successful_overlaps = successful_overlaps +  table_length(total_cards) - table_length(failed_cards)
+    end
+    return _matcher_evaluate_count_subflags(matcher[condition].count, successful_overlaps)
+end
+local _matcher_evaluate_count = function(matcher, pcard, condition)
+    local is_match = true
+    local keys = _matcher_get_card_condition_values(pcard, condition)
+    for key, v in pairs(keys) do
+        if v then
+            is_match = _matcher_evaluate_count_subflags(matcher[condition].count, table_length(matcher._pre_count[condition][key]))
+            if matcher[condition].count.overlap then
+                is_match = _matcher_evaluate_count_overlap_subflag(matcher, condition, pcard, key)
+            end
+            if is_match then break end
         end
     end
     return is_match
@@ -4184,85 +4267,34 @@ function SMODS.matcher_evaluate_card(matcher, pcard)
 end
 
 function SMODS.matcher_partial_evaluate(matcher, pcard, condition)
+    local simplified = {
+        rank = true,
+        enhancement = true,
+        seal = true,
+        edition = true,
+        suit = true,
+    }
     local partial_match = true 
-    if condition == "rank" then
-        if matcher.rank.all then
-            for key, _ in pairs(matcher.rank.all) do
-                if key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
-                else partial_match = pcard.base.value == key end
+    if simplified[condition] then
+        local card_values = _matcher_get_card_condition_values(pcard, condition)
+        if matcher[condition].all then
+            for key, _ in pairs(matcher[condition].all) do
+                partial_match = card_values[key]
                 if not partial_match then break end
             end
             if not partial_match then goto skip end
         end
-        if matcher.rank.any then
-            for key, _ in pairs(matcher.rank.any) do
-                if partial_match and key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_rank(pcard) then partial_match = true 
-                else partial_match = pcard.base.value == key end
+        if matcher[condition].any then
+            for key, _ in pairs(matcher[condition].any) do
+                partial_match = card_values[key]
                 if partial_match then break end
             end
             if not partial_match then goto skip end
         end
-    elseif condition == "enhancement" then
-        if matcher.enhancement.all then
-            for key, _ in pairs(matcher.enhancement.all) do
-                if key == SMODS.card_matcher_nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
-                else partial_match = SMODS.has_enhancement(pcard, key) end
+        if matcher[condition].none then
+            for key, _ in pairs(matcher[condition].none) do
+                partial_match = not card_values[key]
                 if not partial_match then break end
-            end
-            if not partial_match then goto skip end
-        end
-        if matcher.enhancement.any then
-            for key, _ in pairs(matcher.enhancement.any) do
-                if key == SMODS.card_matcher_nil_sentinel and not next(SMODS.get_enhancements(pcard)) then partial_match = true
-                else partial_match = SMODS.has_enhancement(pcard, key) end
-                if partial_match then break end
-            end
-            if not partial_match then goto skip end
-        end
-    elseif condition == "seal" then
-        if matcher.seal.all then
-            for key, _ in pairs(matcher.seal.all) do
-                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == SMODS.card_matcher_nil_sentinel)
-                if not partial_match then break end
-            end
-            if not partial_match then goto skip end
-        end
-        if matcher.seal.any then
-            for key, _ in pairs(matcher.seal.any) do
-                partial_match = (pcard.seal and pcard.seal == key) or (not pcard.seal and key == SMODS.card_matcher_nil_sentinel)
-                if partial_match then break end
-            end
-            if not partial_match then goto skip end
-        end
-    elseif condition == "edition" then 
-        if matcher.edition.all then
-            for key, _ in pairs(matcher.edition.all) do
-                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == SMODS.card_matcher_nil_sentinel)
-                if not partial_match then break end
-            end
-            if not partial_match then goto skip end
-        end
-        if matcher.edition.any then
-            for key, _ in pairs(matcher.edition.any) do
-                partial_match = (pcard.edition and pcard.edition.key == key) or (not pcard.edition and key == SMODS.card_matcher_nil_sentinel)
-                if partial_match then break end
-            end
-            if not partial_match then goto skip end
-        end
-    elseif condition == "suit" then
-        if matcher.suit.all then
-            for key, _ in pairs(matcher.suit.all) do
-                if key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
-                else partial_match = pcard:is_suit(key, nil, true) end
-                if not partial_match then break end
-            end
-            if not partial_match then goto skip end
-        end
-        if matcher.suit.any then
-            for key, _ in pairs(matcher.suit.any) do
-                if key == SMODS.card_matcher_nil_sentinel and SMODS.has_no_suit(pcard) then partial_match = true
-                else partial_match = pcard:is_suit(key, nil, true) end
-                if partial_match then break end
             end
             if not partial_match then goto skip end
         end
@@ -4296,16 +4328,14 @@ local _matcher_count_condition = function(matcher, condition, pcard)
         end
     end
     local propagate_to = matcher[condition].count.any_related and matcher[condition].any
-    local propagated_to_any = false
     for key, _ in pairs(values) do
-        if not propagated_to_any or not propagate_to[key] then -- Prevent double counting in case of multi-valued card properties, e.g. quantum enhancements.
-            matcher._pre_count[condition][key] = matcher._pre_count[condition][key] and matcher._pre_count[condition][key] + 1 or 1
-        end
-        if not propagated_to_any and propagate_to and propagate_to[key] then -- If it hasn't propagated, it should propagate (count is any_related and there's an "any" flag) and the card has a property value that matches the "any" flag
-            propagated_to_any = true
+        matcher._pre_count[condition][key] = matcher._pre_count[condition][key] or {}
+        matcher._pre_count[condition][key][pcard] = true
+        if propagate_to and propagate_to[key] then -- If it should propagate (count is any_related and there's an "any" flag) and the card has a property value that matches the "any" flag
             for p_key, v in pairs(propagate_to) do
-                if v and p_key ~= key then
-                    matcher._pre_count[condition][p_key] = matcher._pre_count[condition][p_key] and matcher._pre_count[condition][p_key] + 1 or 1
+                if v then
+                    matcher._pre_count[condition][p_key] = matcher._pre_count[condition][p_key] or {}
+                    matcher._pre_count[condition][p_key][pcard] = true
                 end
             end
         end
@@ -4319,7 +4349,7 @@ function SMODS.match_cards(cards, matchers)
     for i, matcher in ipairs(matchers) do
         for condition, flags in pairs(matcher) do
             if flags.count then
-                matcher._pre_count = matcher._pre_count or {}
+                matcher._pre_count = matcher._pre_count or {} -- Counterintuitively, this is of form table<condition (e.g. "seal"), table<value (e.g. "Red"), table<Card, boolean>>>, so to get the actual count table_length() has to be called on the innermost table.
                 matcher._pre_count[condition] = {}
                 for _, pcard in ipairs(cards) do
                     _matcher_count_condition(matcher, condition, pcard)
@@ -4338,6 +4368,7 @@ function SMODS.match_cards(cards, matchers)
                 cards_met_matchers[pcard][matcher] = true
             end
         end
+        matcher._pre_count = nil
     end
     return matchers_met_cards, cards_met_matchers
 end

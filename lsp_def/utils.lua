@@ -782,12 +782,17 @@ function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 --- Shared flags (all conditions support these):
 ---     "any" = {...}           -> map of keys, matcher matches if the card is/has any of them (quantum ranks/seals/editions are currently not supported)
 ---     "all" = {...}           -> ^ same but only matches if the card is all of them (quantum ranks/seals/editions are currently not supported)
+---     "none" = {...}          -> ^ same but only matches if the card is none of them
 ---     "count" = {...}         -> "count" has the following subflags;
 ---             "exact" = integer       -> The exact number of cards that must share a card's property, e.g. its enhancement, for the matcher to match a card.
 ---             "at_least" = integer    -> The minimum number of cards ...^
 ---             "at_most" = integer     -> The maximum number of cards ...^
 ---             "func" = function       -> A function, which is called with the total number of cards that share a card's property (^), expecting a boolean return value to determine whether it matches or not. -> e.g. is_even() check or similar
 ---             "any_related" = boolean -> Whether to count a matched card's property as all of the property keys of the "any" flag. -> This allows matching cards based on the number of cards that share any of the "any" values, instead of specifically the card's property value.
+---             "overlap" = {...}       -> "overlap" allows for linking conditions and has the following subflags;
+---                     "any" = {...}       -> A map of conditions; A card which shares the base condition (e.g. enhancement) with another card must also share any of the conditions in this map.
+---                     "all" = {...}       -> Same as the above, but a card must share all conditions.
+---                     "none" = {...}      -> Same but only matches if the card shares none of them.
 --- Unique flags:
 --- "check_function" condition:
 ---     flags = [function]      -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not
