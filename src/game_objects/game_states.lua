@@ -426,7 +426,7 @@ SMODS.GameState {
                             G:save_settings()
                         end
                         G.GAME.round_resets.blind = G.P_BLINDS[args.key]
-                        G.GAME.round_resets.blind_states[G.GAME.blind_on_deck] = 'Current' -- TODO : Check this / G.GAME.blind_on_deck 
+                        G.GAME.round_resets.blind_states[G.GAME.blind_on_deck] = 'Current'
                         delay(0.2)
                         return true
                 end}))
