@@ -4146,7 +4146,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     end
 
     function SMODS.push_to_state_stack(state, args)
-        table.insert(SMODS.state_stack, {state=state, args=args})
+        local data = SMODS.GameStates[state] and SMODS.GameStates[state].store_to_stack()
+        table.insert(SMODS.state_stack, {state=state, args=args, data=data})
     end
 
     function SMODS.pop_from_state_stack(state)
@@ -4162,39 +4163,43 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     function SMODS.clear_states(exempt_map)
         exempt_map = exempt_map or {}
+        for i, state_table in ipairs(SMODS.state_stack) do
+            exempt_map[state_table.state] = true
+        end
         if G.blind_select and not exempt_map[SMODS.STATES.BLIND_SELECT] then G.blind_select:remove(); G.blind_select = nil end
         if G.shop and not exempt_map[SMODS.STATES.SHOP] then G.shop:remove(); G.shop = nil end
         if G.buttons and not exempt_map[SMODS.STATES.BLIND] then G.buttons:remove(); G.buttons = nil end
         if G.round_eval and not exempt_map[SMODS.STATES.ROUND_EVAL] then G.round_eval:remove(); G.round_eval = nil end
     end
 
-    function SMODS.enter_state(state, enter_args, exit_args)
-        local previous_state = SMODS.STATE or G.STATE -- It only handles on_exit() and on_enter() for SMODS.GameState states
-        if previous_state == state then return end
+    function SMODS.enter_state(new_state, enter_args, exit_args)
+        local current_state = SMODS.STATE or G.STATE -- It only handles on_exit() and on_enter() for SMODS.GameState states
+        if current_state == new_state then return end
         enter_args = enter_args or {}
         exit_args = exit_args or {}
-        exit_args.new_state = exit_args.new_state or state
-        if SMODS.GameStates[previous_state] then
-            SMODS.GameStates[previous_state]:on_exit(exit_args)
+        exit_args.new_state = exit_args.new_state or new_state
+        SMODS.clear_states()
+        if SMODS.GameStates[current_state] then
+            SMODS.GameStates[current_state]:on_exit(exit_args)
             if not exit_args.from_hold then
-                SMODS.pop_from_state_stack(previous_state)
+                SMODS.pop_from_state_stack(current_state)
             end
         end
-        G.STATE = state
-        if SMODS.GameStates[state] then
-            SMODS.STATE = state
-            SMODS.GameStates[state]:on_enter(enter_args)
-            SMODS.push_to_state_stack(state, enter_args)
+        G.STATE = new_state
+        if SMODS.GameStates[new_state] then
+            SMODS.STATE = new_state
+            SMODS.push_to_state_stack(new_state, enter_args)
+            SMODS.GameStates[new_state]:on_enter(enter_args)
         end
     end
 
     function SMODS.exit_state(exit_args, enter_args, default)
         local current_state = SMODS.STATE or G.STATE
         local new_state
-        if #SMODS.state_stack < 1 then
+        if #SMODS.state_stack < 2 then
             new_state = default.state_override or SMODS.default_state
         else
-            new_state = SMODS.state_stack[#SMODS.state_stack].state
+            new_state = SMODS.state_stack[#SMODS.state_stack - 1].state
         end
         exit_args = exit_args or {}
         exit_args.new_state = exit_args.new_state or new_state
@@ -4202,6 +4207,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         enter_args.from_hold = true
         default = default or {}
         default.enter_args = default.enter_args or {}
+        SMODS.clear_states()
         if SMODS.GameStates[current_state] then
             SMODS.GameStates[current_state]:on_exit(exit_args)
             SMODS.pop_from_state_stack(current_state)
@@ -4241,6 +4247,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         on_enter = function (self, args) end,
         on_exit = function (self, args) end,
         update = function (self, dt) end,
+        store_to_stack = function () end, -- Called when SMODS.push_to_state_stack() is called for this GameState, allows returning thus storing per-instance state data, to restore when e.g. re-entering from being held.
         ease_background_colour = nil, -- function
         exit_after_use_card = false, -- Used for consumable states like SMODS.STATES.REDEEM_VOUCHER
         exit_after_end_consumable = false, -- Used for booster-like states like SMODS.STATES.BOOSTER_OPENED
@@ -4268,13 +4275,13 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 if G.shop then 
 					G.shop.alignment.offset.y = G.shop.alignment.offset.py
 					G.shop.alignment.offset.py = nil
+                    G.SHOP_SIGN.alignment.offset.y = 0
                 end
                 return
             end
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function ()
-                    SMODS.clear_states()
                     stop_use()
                     G.STATE_COMPLETE = true
                     ease_background_colour_blind(G.STATES.SHOP)
@@ -4396,6 +4403,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 if G.shop and not G.shop.alignment.offset.py then
                     G.shop.alignment.offset.py = G.shop.alignment.offset.y
                     G.shop.alignment.offset.y = G.ROOM.T.y + 29
+                    G.SHOP_SIGN.alignment.offset.y = -15
                 end
                 return
             end
@@ -4455,7 +4463,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function ()
-                    SMODS.clear_states()
                     stop_use()
                     G.STATE_COMPLETE = true
                     G.E_MANAGER:add_event(Event({
@@ -4551,7 +4558,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function ()
-                    SMODS.clear_states()
                     stop_use()
                     G.GAME.facing_blind = true
 
@@ -4663,7 +4669,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function()
-                    SMODS.clear_states()
                     stop_use()
                     ease_background_colour_blind(SMODS.STATES.BLIND_SELECT)
                     G.E_MANAGER:add_event(Event({ func = function() save_run(); return true end}))

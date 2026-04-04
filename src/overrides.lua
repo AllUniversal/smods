@@ -3156,7 +3156,7 @@ G.FUNCS.use_card = function(e, mute, nosave)
 					delay = 0.1,
 					func = function()
 						if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].exit_after_use_card then -- SMODS.STATES.BOOSTER_OPENED is handled by G.FUNCS.end_consumeable() below
-							SMODS.exit_state(nil, prev_state)
+							SMODS.exit_state(nil, nil, {state_override=prev_state})
 						elseif not SMODS.GameStates[G.STATE] then
 							G.STATE = prev_state
 						end
@@ -3253,7 +3253,7 @@ G.FUNCS.end_consumeable = function(e, delayfac)
 						if G.shop then G.CONTROLLER:snap_to({node = G.shop:get_UIE_by_ID('next_round_button')}) end
 					return true end }))
 					if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].exit_after_end_consumable then
-						SMODS.exit_state(nil, G.GAME.PACK_INTERRUPT)
+						SMODS.exit_state(nil, nil, {state_override=G.GAME.PACK_INTERRUPT})
 					elseif not SMODS.GameStates[G.STATE] then
 						G.STATE = G.GAME.PACK_INTERRUPT
 					end
