@@ -28,36 +28,28 @@ target = 'game.lua'
 match_indent = true
 position = 'at'
 pattern = '''
-    self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or G.STATES.BLIND_SELECT)
+self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or G.STATES.BLIND_SELECT)
 '''
 payload = '''
 self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or SMODS.STATES.BLIND_SELECT)
 '''
+# Game:prep_stage()
 [[patches]]
 [patches.pattern]
 target = 'game.lua'
 match_indent = true
 position = 'at'
 pattern = '''
-    self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or G.STATES.BLIND_SELECT)
+self.STATE = new_state or self.STATES.MENU
 '''
 payload = '''
-self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or SMODS.STATES.BLIND_SELECT)
+SMODS.enter_state(new_state or SELF.STATES.MENU)
 '''
 
-# functions/button_callbacks.lua : G.FUNCS.use_card() : update logic
+# cardarea.lua : CardArea:draw() : update logic
 [[patches]]
 [patches.pattern]
-target = 'functions/button_callbacks.lua'
-pattern = '''if card.ability.set == 'Booster' and not nosave and G.STATE == G.STATES.SHOP then'''
-position = 'at'
-match_indent = true
-payload = '''if card.ability.set == 'Booster' and not nosave and G.STATE == SMODS.STATES.SHOP then'''
-
-# functions/button_callbacks.lua : G.FUNCS.use_card() : update logic
-[[patches]]
-[patches.pattern]
-target = 'functions/button_callbacks.lua'
+target = 'cardarea.lua'
 pattern = '''(self.config.type == 'hand' and ({[G.STATES.SHOP]=1, [G.STATES.TAROT_PACK]=1, [G.STATES.SPECTRAL_PACK]=1, [G.STATES.STANDARD_PACK]=1,[G.STATES.BUFFOON_PACK]=1,[G.STATES.PLANET_PACK]=1, [G.STATES.ROUND_EVAL]=1, [G.STATES.BLIND_SELECT]=1})[state]) or'''
 position = 'at'
 match_indent = true

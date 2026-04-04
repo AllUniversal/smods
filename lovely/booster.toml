@@ -34,7 +34,7 @@ payload = """
 booster_obj = self.config.center
 if booster_obj and SMODS.Centers[booster_obj.key] then
     SMODS.OPENED_BOOSTER = self
-    SMODS.enter_state(SMODS.STATES.BOOSTER_OPENED)
+    SMODS.enter_state(SMODS.STATES.BOOSTER_OPENED, nil, true)
 end
 G.GAME.pack_choices = math.min((self.ability.choose or self.config.center.config.choose or 1) + (G.GAME.modifiers.booster_choice_mod or 0), self.ability.extra and math.max(1, self.ability.extra + (G.GAME.modifiers.booster_size_mod or 0)) or self.config.center.extra and math.max(1, self.config.center.extra + (G.GAME.modifiers.booster_size_mod or 0)) or 1)
 """
@@ -89,7 +89,7 @@ payload = '''
 SMODS.calculate_context({modify_booster_card = true, booster = self, card = card, index = i})
 '''
 
-# G.FUNC.can_skip_booster
+# G.FUNCS.can_skip_booster
 # TODO customize whether pack can be skipped
 [[patches]]
 [patches.regex]
@@ -106,16 +106,6 @@ pattern = "(self.config.type == 'deck' and self ~= G.deck) or"
 position = "before"
 payload = '''
 (self.config.type == 'hand' and state == SMODS.STATES.BOOSTER_OPENED) or'''
-match_indent = true
-
-# G.FUNCS.use_card
-[[patches]]
-[patches.pattern]
-target = "functions/button_callbacks.lua"
-pattern = "prev_state == G.STATES.SPECTRAL_PACK or prev_state == G.STATES.STANDARD_PACK or"
-position = "after"
-payload = '''
-prev_state == SMODS.STATES.BOOSTER_OPENED or'''
 match_indent = true
 
 # CardArea:align_cards()
@@ -143,87 +133,6 @@ target = "card.lua"
 pattern = "if G.STATE == G.STATES.SELECTING_HAND or G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == G.STATES.PLANET_PACK then"
 position = "at"
 payload = "if G.STATE == G.STATES.SELECTING_HAND or G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == G.STATES.PLANET_PACK or G.STATE == SMODS.STATES.BOOSTER_OPENED then"
-match_indent = true
-
-# G.FUNCS.use_card()
-[[patches]]
-[patches.pattern]
-target = "functions/button_callbacks.lua"
-pattern = "if G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.PLANET_PACK or G.STATE == G.STATES.SPECTRAL_PACK then"
-position = "at"
-payload = """
-if nc then
-    if area then area:remove_from_highlighted(card) end
-    play_sound('cardSlide2', nil, 0.3)
-    dont_dissolve = true
-end
-if (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.PLANET_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == SMODS.STATES.BOOSTER_OPENED) then"""
-match_indent = true
-
-# G.FUNC.use_card()
-[[patches]]
-[patches.pattern]
-target = "functions/button_callbacks.lua"
-pattern = 'if area == G.consumeables then'
-position = 'before'
-match_indent = true
-payload = '''
-if nc and area == G.pack_cards and not select_to then G.pack_cards:remove_card(card); G.consumeables:emplace(card) end'''
-
-# G.FUNC.use_card()
-[[patches]]
-[patches.pattern]
-target = "functions/button_callbacks.lua"
-pattern = '''if prev_state == G.STATES.TAROT_PACK then inc_career_stat('c_tarot_reading_used', 1) end'''
-position = 'at'
-match_indent = true
-payload = '''if prev_state == SMODS.STATES.BOOSTER_OPENED and booster_obj.name:find('Arcana') then inc_career_stat('c_tarot_reading_used', 1) end'''
-
-# G.FUNC.use_card()
-[[patches]]
-[patches.pattern]
-target = "functions/button_callbacks.lua"
-pattern = '''if prev_state == G.STATES.PLANET_PACK then inc_career_stat('c_planetarium_used', 1) end'''
-position = 'at'
-match_indent = true
-payload = '''if prev_state == SMODS.STATES.BOOSTER_OPENED and booster_obj.name:find('Celestial') then inc_career_stat('c_planetarium_used', 1) end'''
-
-# G.FUNC.use_card()
-[[patches]]
-[patches.pattern]
-target = "functions/button_callbacks.lua"
-pattern = "(G.STATE == G.STATES.BUFFOON_PACK and G.STATES.BUFFOON_PACK) or"
-position = "before"
-payload = "(G.STATE == SMODS.STATES.BOOSTER_OPENED and SMODS.STATES.BOOSTER_OPENED) or"
-match_indent = true
-
-# G.FUNC.use_card()
-[[patches]]
-[patches.pattern]
-target = "functions/state_events.lua"
-pattern = "if not (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK) and"
-position = "at"
-payload = "if not (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == SMODS.STATES.BOOSTER_OPENED) and"
-match_indent = true
-
-# Card:use_consumeable()
-[[patches]]
-[patches.regex]
-target = "card.lua"
-pattern = '''(?<indent>[\t ]*)align = \(G\.STATE[\s\S]*and -0\.2 or 0},'''
-position = "at"
-payload = '''
-align = (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == SMODS.STATES.BOOSTER_OPENED) and 'tm' or 'cm',
-offset = {x = 0, y = (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == SMODS.STATES.BOOSTER_OPENED) and -0.2 or 0},'''
-line_prepend = '$indent'
-
-# G.FUNCS.use_card()
-[[patches]]
-[patches.pattern]
-target = "functions/button_callbacks.lua"
-pattern = "e.config.ref_table:redeem()"
-position = "before"
-payload = "if area == G.pack_cards then e.config.ref_table.cost = 0 end"
 match_indent = true
 
 ## Stopping ease_dollars anim from playing when voucher is free
@@ -264,50 +173,6 @@ if card.ability.consumeable and card.area == G.pack_cards and G.pack_cards and b
 end
 '''
 
-# G.FUNCS.use_card()
-[[patches]]
-[patches.pattern]
-target = 'functions/button_callbacks.lua'
-match_indent = true
-position = 'at'
-pattern = '''
-if card.ability.consumeable then
-      if nc then
-'''
-payload = '''
-if select_to then
-    card:add_to_deck()
-    G[select_to]:emplace(card)
-    if card.config.center.on_select and type(card.config.center.on_select) == 'function' then
-        card.config.center:on_select(card)
-    end
-    play_sound('card1', 0.8, 0.6)
-    play_sound('generic1')
-    dont_dissolve = true
-    delay_fac = 0.2
-elseif card.ability.consumeable then
-      if nc then
-'''
-# G.FUNCS.end_consumeable()
-[[patches]]
-[patches.pattern]
-target = 'functions/button_callbacks.lua'
-match_indent = true
-position = 'before'
-pattern = '''
-for i = 1, #G.GAME.tags do
-    if G.GAME.tags[i]:apply_to_run({type = 'new_blind_choice'}) then break end
-end
-
-G.E_MANAGER:add_event(Event({trigger = 'after',delay = 0.2*delayfac,
-          func = function()
-            save_run()
-            return true
-      end}))
-'''
-payload = '''
-booster_obj = nil
-'''
 # G.FUNCS.skip_booster()
 [[patches]]
 [patches.pattern]
@@ -341,19 +206,4 @@ target = 'card.lua'
 match_indent = true
 position = 'after'
 pattern = '''if self.shop_voucher then G.GAME.current_round.voucher = nil end'''
-payload = '''G.STATE = SMODS.STATES.REDEEM_VOUCHER'''
-
-# G.FUNCS.use_card()
-# Consumables in areas other than the consumable don't count 
-# as picking an item in boosters when used
-[[patches]]
-[patches.pattern]
-target = 'functions/button_callbacks.lua'
-match_indent = true
-position = 'at'
-pattern = '''
-if area == G.consumeables then
-'''
-payload = '''
-if area ~= G.pack_cards then
-'''
+payload = '''SMODS.enter_state(SMODS.STATES.REDEEM_VOUCHER, nil, true)'''

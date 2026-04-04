@@ -1857,27 +1857,32 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     end
 
     function SMODS.get_blind_types(blind_obj)
+        local ret
         if type(blind_obj.get_types) == "function" then
-            return blind_obj:get_types()
-        else
-            if v.boss then
-                if not v.boss.showdown then
+            ret = blind_obj:get_types()
+        end
+        if not ret then
+            if blind_obj.boss then
+                if not blind_obj.boss.showdown then
                     return {Boss = true}
                 else
                     return {Showdown = true}
                 end
             else
-                if v.name == "Small Blind" then
+                if blind_obj.name == "Small Blind" then
                     return {Small = true}
                 else
                     return {Big = true}
                 end
             end
         end
+        return ret
     end
 
     function get_new_boss()
-        sendWarnMessage("get_new_boss() is deprecated; Call SMODS.get_new_blind() instead.", "utils")
+        -- sendWarnMessage("get_new_boss() is deprecated; Call SMODS.get_new_blind() instead.", "utils")
+        local boss = SMODS.get_new_blind({Boss = true})
+        return boss
     end
 
     function SMODS.get_new_blind(blind_types)
@@ -1899,7 +1904,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             local res = SMODS.add_to_pool(v)
             if res then
                 local b_types = SMODS.get_blind_types(v)
-                for _, b_type in pairs(b_types) do
+                for b_type, _ in pairs(b_types) do
                     if blind_types[b_type] then
                         if v.in_pool or not v.boss or (v.boss.min <= math.max(1, G.GAME.round_resets.ante) and ((math.max(1, G.GAME.round_resets.ante))%G.GAME.win_ante ~= 0 or G.GAME.round_resets.ante < 2)) then
                             eligible_bosses[k] = true
@@ -4151,6 +4156,10 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         end
     end
 
+    function SMODS.clear_state_stack()
+        SMODS.state_stack = {}
+    end
+
     function SMODS.clear_states(exempt_map)
         exempt_map = exempt_map or {}
         if G.blind_select and not exempt_map[SMODS.STATES.BLIND_SELECT] then G.blind_select:remove(); G.blind_select = nil end
@@ -4159,35 +4168,48 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         if G.round_eval and not exempt_map[SMODS.STATES.ROUND_EVAL] then G.round_eval:remove(); G.round_eval = nil end
     end
 
-    function SMODS.enter_state(state, args, hold_state)
-        if G.STATE == state then return end
-        if SMODS.GameStates[G.STATE] and hold_state then
-            SMODS.GameStates[G.STATE]:on_exit({new_state=state}, true)
-        end
-        if not hold_state then
-            SMODS.pop_from_state_stack(G.STATE)
+    function SMODS.enter_state(state, args, do_hold_state)
+        local previous_state = SMODS.STATE or G.STATE -- It only handles on_exit() and on_enter() for SMODS.GameState states
+        if previous_state == state then return end
+        if SMODS.GameStates[previous_state] then
+            SMODS.GameStates[previous_state]:on_exit({new_state=state}, do_hold_state)
+            if not do_hold_state then
+                SMODS.pop_from_state_stack(previous_state)
+            end
         end
         G.STATE = state
-        if SMODS.GameStates[G.STATE] then
-            SMODS.GameStates[G.STATE]:on_enter(args)
+        if SMODS.GameStates[state] then
+            SMODS.STATE = state
+            SMODS.GameStates[state]:on_enter(args)
+            SMODS.push_to_state_stack(state, args)
         end
-        SMODS.push_to_state_stack(state, args)
     end
 
-    function SMODS.exit_state(args)
-        if SMODS.GameStates[G.STATE] then
-            SMODS.GameStates[G.STATE]:on_exit(args)
+    function SMODS.exit_state(args, default_state_override)
+        local current_state = SMODS.STATE or G.STATE
+        if SMODS.GameStates[current_state] then
+            SMODS.GameStates[current_state]:on_exit(args)
+            SMODS.pop_from_state_stack(current_state)
         end
-        SMODS.pop_from_state_stack(G.STATE)
-        if #SMODS.context_stack < 1 then
+        if #SMODS.state_stack < 1 then
             G.STATE = nil
-            SMODS.enter_state(SMODS.default_state)
+            SMODS.STATE = nil
+            SMODS.enter_state(default_state_override or SMODS.default_state)
             return
         end
-        G.STATE = SMODS.context_stack[#SMODS.context_stack].state
+        G.STATE = SMODS.state_stack[#SMODS.state_stack].state
         if SMODS.GameStates[G.STATE] then
+            SMODS.STATE = G.STATE
             SMODS.GameStates[G.STATE]:on_enter(args, true)
         end
+    end
+
+    local delete_run_ref = Game.delete_run
+    function Game:delete_run()
+        local ret = delete_run_ref(self)
+        SMODS.STATE = nil
+        SMODS.clear_state_stack()
+        return ret
     end
 
     SMODS.GameStates = {}
@@ -4205,26 +4227,38 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         on_exit = function (self, args, from_hold) end,
         update = function (self, dt) end,
         ease_background_colour = nil, -- function
+        exit_after_use_card = false, -- Used for consumable states like SMODS.STATES.REDEEM_VOUCHER
+        exit_after_end_consumable = false, -- Used for booster-like states like SMODS.STATES.BOOSTER_OPENED
     }
 
     SMODS.GameState {
         key = SMODS.STATES.BOOSTER_OPENED,
         update = function (self, dt)
             SMODS.OPENED_BOOSTER.config.center:update_pack(dt)
-        end
+        end,
+        exit_after_end_consumable = true,
     }
 
     SMODS.GameState {
-        key = SMODS.STATES.REDEEM_VOUCHER
+        key = SMODS.STATES.REDEEM_VOUCHER,
+        exit_after_use_card = true,
     }
 
     SMODS.GameState {
         key = SMODS.STATES.SHOP,
         on_enter = function (self, args, from_hold)
+            if from_hold then
+                -- Extracted from G.FUNCS.use_card()
+                if G.shop then 
+					G.shop.alignment.offset.y = G.shop.alignment.offset.py
+					G.shop.alignment.offset.py = nil
+                end
+                return
+            end
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function ()
-                    SMODS.clear_states({[SMODS.STATES.SHOP] = true})
+                    SMODS.clear_states()
                     stop_use()
                     G.STATE_COMPLETE = true
                     ease_background_colour_blind(G.STATES.SHOP)
@@ -4342,6 +4376,13 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             }))
         end,
         on_exit = function (self, args, from_hold)
+            if from_hold then
+                if G.shop and not G.shop.alignment.offset.py then
+                    G.shop.alignment.offset.py = G.shop.alignment.offset.y
+                    G.shop.alignment.offset.y = G.ROOM.T.y + 29
+                end
+                return
+            end
             stop_use()
             G.CONTROLLER.locks.toggle_shop = true
             if G.shop then
@@ -4388,6 +4429,13 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     SMODS.GameState {
         key = SMODS.STATES.ROUND_EVAL,
         on_enter = function (self, args, from_hold)
+            if from_hold then
+                if G.round_eval then
+					G.round_eval.alignment.offset.y = G.round_eval.alignment.offset.py
+					G.round_eval.alignment.offset.py = nil
+					end
+                return
+            end
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function ()
@@ -4427,6 +4475,13 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             }))
         end,
         on_exit = function (self, args, from_hold)
+            if from_hold then
+                if G.round_eval and not G.round_eval.alignment.offset.py then
+                    G.round_eval.alignment.offset.py = G.round_eval.alignment.offset.y
+                    G.round_eval.alignment.offset.y = G.ROOM.T.y + 29
+                end
+                return
+            end
             stop_use()
             if G.round_eval then
                 G.round_eval.alignment.offset.y = G.ROOM.T.y + 15
@@ -4434,6 +4489,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 G.deck:shuffle('cashout'..G.GAME.round_resets.ante)
                 G.deck:hard_set_T()
                 delay(0.3)
+                G.GAME.current_round.discards_left = math.max(0, G.GAME.round_resets.discards + G.GAME.round_bonus.discards)
+				G.GAME.current_round.hands_left = (math.max(1, G.GAME.round_resets.hands + G.GAME.round_bonus.next_hands))
                 G.E_MANAGER:add_event(Event({
                     trigger = 'immediate',
                     func = function()
@@ -4455,7 +4512,13 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 play_sound("coin7")
                 G.VIBRATION = G.VIBRATION + 1
             end
+            
             ease_chips(0)
+            if G.GAME.round_resets.blind_states.Boss == 'Defeated' then 
+                G.GAME.round_resets.blind_ante = G.GAME.round_resets.ante
+                G.GAME.round_resets.blind_tags.Small = get_next_tag_key()
+                G.GAME.round_resets.blind_tags.Big = get_next_tag_key()
+            end
             reset_blinds()
             delay(0.6)
         end,
@@ -4501,25 +4564,44 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         on_exit = function (self, args, from_hold)
             G.GAME.facing_blind = nil
             if not from_hold then
-                -- Taken from G.FUNC.evaluate_round(), defeats blind
-                -- The extra nested immediate event should hopefully preserve the vanilla timing
+                -- Taken from G.FUNCS.evaluate_round(), defeats blind
+                -- The extra nested immediate events should hopefully preserve the vanilla timing
                 G.E_MANAGER:add_event(Event({
                     trigger = "immediate",
                     func = function ()
                         G.E_MANAGER:add_event(Event({
-                            trigger = 'before',
-                            delay = 1.3*math.min(G.GAME.blind.dollars+2, 7)/2*0.15 + 0.5,
-                            func = function()
-                                G.GAME.blind:defeat()
-                                G.GAME.current_round.discards_left = math.max(0, G.GAME.round_resets.discards + G.GAME.round_bonus.discards)
-                                G.GAME.current_round.hands_left = (math.max(1, G.GAME.round_resets.hands + G.GAME.round_bonus.next_hands))
+                            trigger = "immediate",
+                            func = function ()
+                                G.E_MANAGER:add_event(Event({
+                                    trigger = "immediate",
+                                    blocking = false,
+                                    func = function ()
+                                        if not G.round_eval or (G.round_eval.alignment.offset.y == -7.8 and math.abs(G.round_eval.T.y - G.round_eval.VT.y) < 3) then
+                                            G.E_MANAGER:add_event(Event({
+                                                trigger = "immediate",
+                                                func = function ()
+                                                    G.E_MANAGER:add_event(Event({
+                                                        trigger = 'before',
+                                                        delay = 1.3*math.min(G.GAME.blind.dollars+2, 7)/2*0.15 + 0.5,
+                                                        func = function()
+                                                            G.GAME.blind:defeat()
+                                                            return true
+                                                        end
+                                                    }))
+                                                    delay(0.2)
+                                                    return true
+                                                end
+                                            }))
+                                            return true
+                                        end
+                                    end,
+                                }))
                                 return true
                             end
                         }))
                         return true
                     end
                 }))
-                ------
             end
 
         end,
@@ -4544,6 +4626,13 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     SMODS.GameState {
         key = SMODS.STATES.BLIND_SELECT,
         on_enter = function (self, args, from_hold)
+            if from_hold then
+                if G.blind_select then
+					G.blind_select.alignment.offset.y = G.blind_select.alignment.offset.py
+					G.blind_select.alignment.offset.py = nil
+                end
+                return
+            end
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function()
@@ -4557,7 +4646,10 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                             trigger = 'immediate',
                             func = function()
                                 play_sound('cancel')
-                                G.blind_select = SMODS.get_ante_path():create_ui()
+                                G.blind_select = UIBox{
+                                    definition = create_UIBox_blind_select(),
+                                    config = {align="bmi", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}
+                                }
                                 G.blind_select.alignment.offset.y = 0.8-(G.hand.T.y - G.jokers.T.y) + G.blind_select.T.h
                                 G.ROOM.jiggle = G.ROOM.jiggle + 3
                                 G.blind_select.alignment.offset.x = 0
@@ -4578,7 +4670,13 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             }))
         end,
         on_exit = function (self, args, from_hold)
-            -- TODO : Figure out what this was doing
+            if from_hold then
+                if G.blind_select and not G.blind_select.alignment.offset.py then
+                    G.blind_select.alignment.offset.py = G.blind_select.alignment.offset.y
+                    G.blind_select.alignment.offset.y = G.ROOM.T.y + 39
+                end
+                return
+            end
             G.blind_prompt_box:get_UIE_by_ID('prompt_dynatext1').config.object.pop_delay = 0
             G.blind_prompt_box:get_UIE_by_ID('prompt_dynatext1').config.object:pop_out(5)
             G.blind_prompt_box:get_UIE_by_ID('prompt_dynatext2').config.object.pop_delay = 0

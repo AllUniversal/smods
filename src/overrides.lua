@@ -2729,7 +2729,25 @@ function G.FUNCS.toggle_shop(e)
 end
 
 function G.FUNCS.cash_out(e)
-	SMODS.enter_state(SMODS.STATES.SHOP)
+	stop_use()
+	if G.round_eval then  
+		e.config.button = nil
+		G.E_MANAGER:add_event(Event({
+			trigger = 'immediate',
+			func = function()
+				SMODS.enter_state(SMODS.STATES.SHOP)
+				G.STATE_COMPLETE = false
+			return true
+			end
+		}))
+	end
+end
+
+function G.FUNCS.select_blind(e)
+	stop_use()
+	if G.blind_select then
+		SMODS.enter_state(SMODS.STATES.BLIND, {key = e.config.ref_table.key})
+	end
 end
 
 local ease_bg_col_bl_ref = ease_background_colour_blind
@@ -2837,7 +2855,7 @@ function end_round()
 					if G.GAME.modifiers.set_joker_slots_ante and (G.GAME.round_resets.ante == G.GAME.modifiers.set_joker_slots_ante) then 
 						G.jokers.config.card_limit = 0
 					end
-					delay(0.4)
+					delay(0.4); ease_ante(1); delay(0.4); check_for_unlock({type = 'ante_up', ante = G.GAME.round_resets.ante + 1})
 				end
 				G.FUNCS.draw_from_discard_to_deck()
 				G.E_MANAGER:add_event(Event({
@@ -2848,7 +2866,6 @@ function end_round()
 						G.STATE_COMPLETE = false
 
 						if G.GAME.round_resets.blind == G.P_BLINDS.bl_small then
-							-- TODO : Check/Replace blind_states
 							G.GAME.round_resets.blind_states.Small = 'Defeated'
 						elseif G.GAME.round_resets.blind == G.P_BLINDS.bl_big then
 							G.GAME.round_resets.blind_states.Big = 'Defeated'
@@ -2885,5 +2902,379 @@ function end_round()
 	}))
 end
 
--- Create Blind Select UI -> Not used in SMODS.STATES.BLIND_SELECT.on_enter()
-function create_UIBox_blind_select() end
+G.FUNCS.evaluate_round = function()
+    total_cashout_rows = 0
+    local pitch = 0.95
+    local dollars = 0
+
+    if G.GAME.chips - G.GAME.blind.chips >= 0 then
+        add_round_eval_row({dollars = G.GAME.blind.dollars, name='blind1', pitch = pitch})
+        pitch = pitch + 0.06
+        dollars = dollars + G.GAME.blind.dollars
+    else
+        add_round_eval_row({dollars = 0, name='blind1', pitch = pitch, saved = true})
+        pitch = pitch + 0.06
+    end
+
+    G.E_MANAGER:add_event(Event({
+        func = function()
+            ease_background_colour_blind(G.STATES.ROUND_EVAL, '')
+            return true
+        end
+    }))
+    SMODS.calculate_context{round_eval = true}
+    G.GAME.selected_back:trigger_effect({context = 'eval'})
+
+    if G.GAME.current_round.hands_left > 0 and not G.GAME.modifiers.no_extra_hand_money then
+        add_round_eval_row({dollars = G.GAME.current_round.hands_left*(G.GAME.modifiers.money_per_hand or 1), disp = G.GAME.current_round.hands_left, bonus = true, name='hands', pitch = pitch})
+        pitch = pitch + 0.06
+        dollars = dollars + G.GAME.current_round.hands_left*(G.GAME.modifiers.money_per_hand or 1)
+    end
+    if G.GAME.current_round.discards_left > 0 and G.GAME.modifiers.money_per_discard then
+        add_round_eval_row({dollars = G.GAME.current_round.discards_left*(G.GAME.modifiers.money_per_discard), disp = G.GAME.current_round.discards_left, bonus = true, name='discards', pitch = pitch})
+        pitch = pitch + 0.06
+        dollars = dollars +  G.GAME.current_round.discards_left*(G.GAME.modifiers.money_per_discard)
+    end
+    local i = 0
+    for _, area in ipairs(SMODS.get_card_areas('jokers')) do
+        for _, _card in ipairs(area.cards) do
+            local ret, ret_opts = _card:calculate_dollar_bonus()
+            ret_opts = ret_opts or {}
+    
+            -- TARGET: calc_dollar_bonus per card
+            if ret then
+                if not ret_opts.no_eval_row then
+                    i = i+1
+                    add_round_eval_row({dollars = ret, bonus = true, name='joker'..i, pitch = pitch, card = _card, loc_opts = ret_opts})
+                    pitch = pitch + 0.06
+                end
+                dollars = dollars + ret
+            end
+        end
+    end
+    i = 0
+    for _, target in ipairs(SMODS.get_card_areas('individual', 'calc_dollar_bonus')) do
+        if type(target.object.calc_dollar_bonus) == 'function' then
+            local ret, ret_opts = target.object:calc_dollar_bonus()
+            ret_opts = ret_opts or {}
+            local name
+            
+            -- TARGET: calc_dollar_bonus per individual object
+            if ret then
+                if not ret_opts.no_eval_row then
+                    if ret_opts.text then
+                        name = text
+                    elseif (ret_opts.set or target.set) and (ret_opts.key or target.key) then
+                        if ret_opts.set == "Challenge" or (not ret_opts.set and target.set == "Challenge") then
+                            name = localize(ret_opts.key or target.key, 'challenge_names')
+                        elseif (ret_opts.set == "Mod" or (not ret_opts.set and target.set == "Mod")) and not (G.localization.descriptions.Mod or {})[ret_opts.key or target.key] then
+                            name = (SMODS.Mods[ret_opts.key or target.key] or {}).name
+                        else
+                            name = localize{type = 'name_text', set = ret_opts.set or target.set, key = ret_opts.key or target.key}
+                        end
+                    end
+                    i = i+1
+                    add_round_eval_row({dollars = ret, bonus = true, name='custom_individual'..i, pitch = pitch, text_colour = ret_opts.text_colour or G.C.FILTER, text = name or 'ERROR', text_scale = ret_opts.scale or 0.6})
+                    pitch = pitch + 0.06
+                end
+                dollars = dollars + ret
+            end
+        end
+    end
+    for i = 1, #G.GAME.tags do
+        local ret = G.GAME.tags[i]:apply_to_run({type = 'eval'})
+        if ret then
+            add_round_eval_row({dollars = ret.dollars, bonus = true, name='tag'..i, pitch = pitch, condition = ret.condition, pos = ret.pos, tag = ret.tag})
+            pitch = pitch + 0.06
+            dollars = dollars + ret.dollars
+        end
+    end
+    if G.GAME.dollars >= 5 and not G.GAME.modifiers.no_interest then
+        add_round_eval_row({bonus = true, name='interest', pitch = pitch, dollars = G.GAME.interest_amount*math.min(math.floor(G.GAME.dollars/5), G.GAME.interest_cap/5)})
+        pitch = pitch + 0.06
+        if (not G.GAME.seeded and not G.GAME.challenge) or SMODS.config.seeded_unlocks then
+            if G.GAME.interest_amount*math.min(math.floor(G.GAME.dollars/5), G.GAME.interest_cap/5) == G.GAME.interest_amount*G.GAME.interest_cap/5 then 
+                G.PROFILES[G.SETTINGS.profile].career_stats.c_round_interest_cap_streak = G.PROFILES[G.SETTINGS.profile].career_stats.c_round_interest_cap_streak + 1
+            else
+                G.PROFILES[G.SETTINGS.profile].career_stats.c_round_interest_cap_streak = 0
+            end
+        end
+        check_for_unlock({type = 'interest_streak'})
+        dollars = dollars + G.GAME.interest_amount*math.min(math.floor(G.GAME.dollars/5), G.GAME.interest_cap/5)
+    end
+
+    pitch = pitch + 0.06
+
+    if total_cashout_rows > 7 then
+        local total_hidden = total_cashout_rows - 7
+    
+        G.E_MANAGER:add_event(Event({
+            trigger = 'before',delay = 0.38,
+            func = function()
+                local hidden = {n=G.UIT.R, config={align = "cm"}, nodes={
+                    {n=G.UIT.O, config={object = DynaText({
+                        string = {localize{type = 'variable', key = 'cashout_hidden', vars = {total_hidden}}}, 
+                        colours = {G.C.WHITE}, shadow = true, float = false, 
+                        scale = 0.45,
+                        font = G.LANGUAGES['en-us'].font, pop_in = 0
+                    })}}
+                }}
+    
+                G.round_eval:add_child(hidden, G.round_eval:get_UIE_by_ID('bonus_round_eval'))
+                return true
+            end
+        }))
+    end
+    add_round_eval_row({name = 'bottom', dollars = dollars})
+end
+
+-- Todo : *maybe* turn this into a lovely patch 
+G.FUNCS.use_card = function(e, mute, nosave)
+	e.config.button = nil
+	local card = e.config.ref_table
+	local area = card.area
+	local prev_state = G.STATE
+	local dont_dissolve = nil
+	local delay_fac = 1
+
+	if card:check_use() then 
+		G.E_MANAGER:add_event(Event({
+			func = function()
+				e.disable_button = nil
+				e.config.button = 'use_card'
+				return true end 
+			}))
+		return
+	end
+
+	if card.ability.set == 'Booster' and not nosave and G.STATE == SMODS.STATES.SHOP then
+		save_with_action({
+		type = 'use_card',
+		card = card.sort_id,
+		})
+	end
+
+	G.TAROT_INTERRUPT = G.STATE
+	if card.ability.set == 'Booster' then G.GAME.PACK_INTERRUPT = G.STATE end 
+	G.STATE = (G.STATE == G.STATES.TAROT_PACK and G.STATES.TAROT_PACK) or
+		(G.STATE == G.STATES.PLANET_PACK and G.STATES.PLANET_PACK) or
+		(G.STATE == G.STATES.SPECTRAL_PACK and G.STATES.SPECTRAL_PACK) or
+		(G.STATE == G.STATES.STANDARD_PACK and G.STATES.STANDARD_PACK) or
+		(G.STATE == SMODS.STATES.BOOSTER_OPENED and SMODS.STATES.BOOSTER_OPENED) or
+		(G.STATE == G.STATES.BUFFOON_PACK and G.STATES.BUFFOON_PACK) or
+		G.STATES.PLAY_TAROT
+		
+	G.CONTROLLER.locks.use = true
+	local nc
+	local select_to = card.area == G.pack_cards and G.pack_cards and booster_obj and SMODS.card_select_area(card, booster_obj) and card:selectable_from_pack(booster_obj)
+	if card.ability.consumeable and not select_to then
+		local obj = card.config.center
+		if obj.keep_on_use and type(obj.keep_on_use) == 'function' then
+			nc = obj:keep_on_use(card)
+		end
+	end
+	if G.booster_pack and not G.booster_pack.alignment.offset.py and ((not select_to and card.ability.consumeable) or not (G.GAME.pack_choices and G.GAME.pack_choices > 1)) then
+		G.booster_pack.alignment.offset.py = G.booster_pack.alignment.offset.y
+		G.booster_pack.alignment.offset.y = G.ROOM.T.y + 29
+	end
+
+	if card.children.use_button then card.children.use_button:remove(); card.children.use_button = nil end
+	if card.children.sell_button then card.children.sell_button:remove(); card.children.sell_button = nil end
+	if card.children.price then card.children.price:remove(); card.children.price = nil end
+
+	if not card.from_area then card.from_area = card.area end
+	if card.area and (not nc or card.area == G.pack_cards) then card.area:remove_card(card) end
+
+	if select_to then
+		card:add_to_deck()
+		G[select_to]:emplace(card)
+		if card.config.center.on_select and type(card.config.center.on_select) == 'function' then
+			card.config.center:on_select(card)
+		end
+		play_sound('card1', 0.8, 0.6)
+		play_sound('generic1')
+		dont_dissolve = true
+		delay_fac = 0.2
+	elseif card.ability.consumeable then
+			if nc then
+			if area then area:remove_from_highlighted(card) end
+			play_sound('cardSlide2', nil, 0.3)
+			dont_dissolve = true
+		end
+		if (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.PLANET_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == SMODS.STATES.BOOSTER_OPENED) then
+		card.T.x = G.hand.T.x + G.hand.T.w/2 - card.T.w/2
+		card.T.y = G.hand.T.y + G.hand.T.h/2 - card.T.h/2 - 0.5
+		discover_card(card.config.center)
+		elseif not nc then draw_card(G.hand, G.play, 1, 'up', true, card, nil, mute) end
+		delay(0.2)
+		e.config.ref_table:use_consumeable(area)
+		SMODS.calculate_context({using_consumeable = true, consumeable = card, area = card.from_area})
+	elseif card.ability.set == 'Enhanced' or card.ability.set == 'Default' then 
+		G.playing_card = (G.playing_card and G.playing_card + 1) or 1
+		G.deck:emplace(card)
+		play_sound('card1', 0.8, 0.6)
+		play_sound('generic1')
+		card.playing_card = G.playing_card
+		playing_card_joker_effects({card})
+		card:add_to_deck()
+		table.insert(G.playing_cards, card)
+		dont_dissolve = true
+		delay_fac = 0.2
+	elseif card.ability.set == 'Joker' then 
+		card:add_to_deck()
+		G.jokers:emplace(card)
+		play_sound('card1', 0.8, 0.6)
+		play_sound('generic1')
+		dont_dissolve = true
+		delay_fac = 0.2
+	elseif card.ability.set == 'Booster' then 
+		delay(0.1)
+		if card.ability.booster_pos then G.GAME.current_round.used_packs[card.ability.booster_pos] = 'USED' end
+		draw_card(G.hand, G.play, 1, 'up', true, card, nil, true) 
+		if not card.from_tag then 
+		G.GAME.round_scores.cards_purchased.amt = G.GAME.round_scores.cards_purchased.amt + 1
+		end
+		e.config.ref_table:open()
+	elseif card.ability.set == 'Voucher' then 
+		delay(0.1)
+		draw_card(G.hand, G.play, 1, 'up', true, card, nil, true) 
+		G.GAME.round_scores.cards_purchased.amt = G.GAME.round_scores.cards_purchased.amt + 1
+		if area == G.pack_cards then e.config.ref_table.cost = 0 end
+		e.config.ref_table:redeem()
+	end
+	if card.ability.set == 'Booster' then
+		G.CONTROLLER.locks.use = false
+		G.TAROT_INTERRUPT = nil
+	else
+		G.E_MANAGER:add_event(Event({
+			trigger = 'after',
+			delay = 0.2,
+			func = function()
+				if not dont_dissolve then card:start_dissolve() end
+				G.E_MANAGER:add_event(Event({
+					trigger = 'after',
+					delay = 0.1,
+					func = function()
+						if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].exit_after_use_card then -- SMODS.STATES.BOOSTER_OPENED is handled by G.FUNCS.end_consumeable() below
+							SMODS.exit_state(nil, prev_state)
+						elseif not SMODS.GameStates[G.STATE] then
+							G.STATE = prev_state
+						end
+						G.TAROT_INTERRUPT=nil
+						G.CONTROLLER.locks.use = false
+
+						if (prev_state == G.STATES.TAROT_PACK or prev_state == G.STATES.PLANET_PACK or
+							prev_state == G.STATES.SPECTRAL_PACK or prev_state == G.STATES.STANDARD_PACK or
+							prev_state == SMODS.STATES.BOOSTER_OPENED or
+							prev_state == G.STATES.BUFFOON_PACK) and G.booster_pack then
+							if nc and area == G.pack_cards and not select_to then G.pack_cards:remove_card(card); G.consumeables:emplace(card) end
+							if area ~= G.pack_cards then
+							G.booster_pack.alignment.offset.y = G.booster_pack.alignment.offset.py
+							G.booster_pack.alignment.offset.py = nil
+							elseif G.GAME.pack_choices and G.GAME.pack_choices > 1 then
+							if G.booster_pack.alignment.offset.py then 
+								G.booster_pack.alignment.offset.y = G.booster_pack.alignment.offset.py
+								G.booster_pack.alignment.offset.py = nil
+							end
+							G.GAME.pack_choices = G.GAME.pack_choices - 1
+							else
+								G.CONTROLLER.interrupt.focus = true
+								if prev_state == SMODS.STATES.BOOSTER_OPENED and booster_obj.name:find('Arcana') then inc_career_stat('c_tarot_reading_used', 1) end
+								if prev_state == SMODS.STATES.BOOSTER_OPENED and booster_obj.name:find('Celestial') then inc_career_stat('c_planetarium_used', 1) end
+								G.FUNCS.end_consumeable(nil, delay_fac)
+							end
+						else
+							if nc and not area then G.consumeables:emplace(card) end
+							if area and area.cards[1] then 
+								G.E_MANAGER:add_event(Event({
+									func = function()
+										G.E_MANAGER:add_event(Event({
+											func = function()
+												G.CONTROLLER.interrupt.focus = nil
+												if card.ability.set == 'Voucher' then 
+													G.CONTROLLER:snap_to({node = G.shop:get_UIE_by_ID('next_round_button')})
+												elseif area then
+													G.CONTROLLER:recall_cardarea_focus(area)
+												end
+												return true 
+											end 
+										}))
+										return true 
+									end 
+								}))
+							end
+						end
+						return true
+					end
+				}))
+				return true
+			end
+		}))
+	end
+end
+
+-- Todo : turn this into a lovely patch
+G.FUNCS.end_consumeable = function(e, delayfac)
+	delayfac = delayfac or 1
+	stop_use()
+	if G.booster_pack then
+		if G.booster_pack_sparkles then G.booster_pack_sparkles:fade(1*delayfac) end
+		if G.booster_pack_stars then G.booster_pack_stars:fade(1*delayfac) end
+		if G.booster_pack_meteors then G.booster_pack_meteors:fade(1*delayfac) end
+		G.booster_pack.alignment.offset.y = G.ROOM.T.y + 9
+
+		G.E_MANAGER:add_event(Event({trigger = 'after',delay = 0.2*delayfac,blocking = false, blockable = false,
+		func = function()
+			G.booster_pack:remove()
+			G.booster_pack = nil
+		return true
+		end}))
+		G.E_MANAGER:add_event(Event({trigger = 'after',delay = 1*delayfac,blocking = false, blockable = false,
+		func = function()
+		if G.booster_pack_sparkles then G.booster_pack_sparkles:remove(); G.booster_pack_sparkles = nil end
+		if G.booster_pack_stars then G.booster_pack_stars:remove(); G.booster_pack_stars = nil end
+		if G.booster_pack_meteors then G.booster_pack_meteors:remove(); G.booster_pack_meteors = nil end
+		return true
+		end}))
+	end
+
+	delay(0.2*delayfac)
+	G.E_MANAGER:add_event(Event({
+		trigger = 'after',
+		delay = 0.2*delayfac,
+		func = function()
+			G.FUNCS.draw_from_hand_to_deck()
+			G.E_MANAGER:add_event(Event({
+				trigger = 'after',
+				delay = 0.2*delayfac,
+				func = function()
+					G.CONTROLLER.interrupt.focus = true
+					G.E_MANAGER:add_event(Event({func = function()        
+						if G.shop then G.CONTROLLER:snap_to({node = G.shop:get_UIE_by_ID('next_round_button')}) end
+					return true end }))
+					if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].exit_after_end_consumable then
+						SMODS.exit_state(nil, G.GAME.PACK_INTERRUPT)
+					elseif not SMODS.GameStates[G.STATE] then
+						G.STATE = G.GAME.PACK_INTERRUPT
+					end
+					ease_background_colour_blind(G.GAME.PACK_INTERRUPT)
+					G.GAME.PACK_INTERRUPT = nil
+					return true
+				end
+			}))
+			SMODS.calculate_context({ending_booster = true, booster = booster_obj})
+			booster_obj = nil
+			for i = 1, #G.GAME.tags do
+			if G.GAME.tags[i]:apply_to_run({type = 'new_blind_choice'}) then break end
+			end
+
+			G.E_MANAGER:add_event(Event({trigger = 'after',delay = 0.2*delayfac,
+				func = function()
+				save_run()
+				return true
+			end}))
+
+			return true
+		end
+	}))
+end
