@@ -779,7 +779,7 @@ function SMODS.get_atlas_sprite_class(atlas_key) end
 function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 
 --- Conditions: (format {[condition] = {flags}, [condition 2] = ...})
---- Shared flags (all conditions support these):
+--- Shared flags (most conditions support these):
 ---     "any" = {...}           -> map of keys, matcher matches if the card is/has any of them (quantum ranks/seals/editions are currently not supported)
 ---     "all" = {...}           -> ^ same but only matches if the card is all of them (quantum ranks/seals/editions are currently not supported)
 ---     "none" = {...}          -> ^ same but only matches if the card is none of them
@@ -793,6 +793,7 @@ function SMODS.create_sprite(X, Y, W, H, atlas, pos) end
 ---                     "any" = {...}       -> A map of conditions; A card which shares the base condition (e.g. enhancement) with another card must also share any of the conditions in this map.
 ---                     "all" = {...}       -> Same as the above, but a card must share all conditions.
 ---                     "none" = {...}      -> Same but only matches if the card shares none of them.
+---     "invert" = boolean      -> If true, inverts the final result of a condition.
 --- Unique flags:
 --- "check_function" condition:
 ---     flags = [function]      -> matcher.check_function(pcard, matcher) is called for every card, expecting a boolean return value for whether it matched or not
