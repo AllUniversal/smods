@@ -1808,6 +1808,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         config = {},
         dollars = 5,
         mult = 2,
+        blind_types = nil, -- Map of types, used by SMODS.get_new_blind()
         atlas = 'blind_chips',
         discovered = false,
         pos = { x = 0, y = 0 },
@@ -1827,6 +1828,9 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             end
             G.P_BLINDS[self.key] = self
             if self.modifies_draw then SMODS.Blinds.modifies_draw[self.key] = true end
+        end,
+        get_types = function(self)
+            return self.blind_types
         end
     }
     SMODS.Blind:take_ownership('eye', {
