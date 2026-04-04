@@ -4023,7 +4023,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             -- Vanilla Blind structure
             -- "Small" -> "Big" -> "Boss"
             local boss_type = (G.GAME.round_resets.ante)%G.GAME.win_ante == 0 and G.GAME.round_resets.ante > 0 and "Showdown" or "Boss"
-            local tree_data = {
+            local path_data = {
                 key = "vanilla",
                 active_node = 1,
                 nodes = {
@@ -4072,7 +4072,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                     }
                 }
             }
-            return tree_data
+            return path_data
         end,
         create_ui = function (self)
             -- Vanilla Blind select UI
@@ -4378,6 +4378,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             SMODS.ante_end = true
             ease_ante(1)
             SMODS.ante_end = nil
+            check_for_unlock({type = 'ante_up', ante = G.GAME.round_resets.ante + 1})
             -- Moved here from G.FUNCS.cash_out() -> Might have to be moved again for better timing
             G.GAME.round_resets.blind_ante = G.GAME.round_resets.ante
             ------
@@ -4638,16 +4639,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             pitch = pitch + 0.06
         end
 
-        -- if G.GAME.blind then
-        --     G.E_MANAGER:add_event(Event({
-        --         trigger = 'before',
-        --         delay = 1.3*math.min(G.GAME.blind.dollars+2, 7)/2*0.15 + 0.5,
-        --         func = function()
-        --         G.GAME.blind:defeat() -- TODO: Replace in end_round()
-        --         return true
-        --         end
-        --     }))
-        -- end
         delay(0.2)
         G.E_MANAGER:add_event(Event({
             func = function()
@@ -4746,6 +4737,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         --     blhash = 'L'
         -- end
         -- G.GAME.subhash = (G.GAME.round_resets.ante)..(blhash)
+        -- G.GAME.blind:set_blind(G.GAME.round_resets.blind)
     end
 
     -- end_round() TODO : move to lovely patches
@@ -4820,7 +4812,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                             blocking = false,
                             blockable = false,
                             func = (function()
-                                if G.STATE == SMODS.STATES.ROUND_EVAL then
+                                if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].check_win then
                                     win_game()
                                     G.GAME.won = true
                                     return true
@@ -4844,11 +4836,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                             G.jokers.config.card_limit = 0
                         end
                         delay(0.4)
-                        SMODS.ante_end = true
-                        ease_ante(1)
-                        SMODS.ante_end = nil
-                        delay(0.4)
-                        check_for_unlock({type = 'ante_up', ante = G.GAME.round_resets.ante + 1})
                     end
                     G.FUNCS.draw_from_discard_to_deck()
                     G.E_MANAGER:add_event(Event({
@@ -4879,7 +4866,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                             reset_idol_card()
                             reset_mail_rank()
                             reset_ancient_card()
-                            reset_castle_card()                        
+                            reset_castle_card()
                             for _, mod in ipairs(SMODS.mod_list) do
                                 if mod.reset_game_globals and type(mod.reset_game_globals) == 'function' then
                                     mod.reset_game_globals(false)
@@ -4898,7 +4885,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         }))
     end
 
-    -- get_blind_main_colour()
+    -- get_blind_main_colour() -> replace using own system for blind_states
     function get_blind_main_colour(blind)
     
     end
@@ -5188,6 +5175,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 }))
             end
         end,
+        check_win = true,
     }
 
     SMODS.GameState {
@@ -5263,7 +5251,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             ease_chips(0)
             reset_blinds()
             delay(0.6)
-        end
+        end,
+        check_win = true,
     }
 
     SMODS.GameState {
@@ -5406,7 +5395,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 end
             }))
 
-        end
+        end,
+        check_win = true,
     }
 
     -------------------------------------------------------------------------------------------------
