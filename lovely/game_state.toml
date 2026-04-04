@@ -21,6 +21,30 @@ if SMODS.GameStates[self.STATE] then
 end
 '''
 
+# Game:start_run()
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+    self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or G.STATES.BLIND_SELECT)
+'''
+payload = '''
+self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or SMODS.STATES.BLIND_SELECT)
+'''
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+    self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or G.STATES.BLIND_SELECT)
+'''
+payload = '''
+self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or SMODS.STATES.BLIND_SELECT)
+'''
+
 # functions/button_callbacks.lua : G.FUNCS.use_card() : update logic
 [[patches]]
 [patches.pattern]
@@ -29,3 +53,12 @@ pattern = '''if card.ability.set == 'Booster' and not nosave and G.STATE == G.ST
 position = 'at'
 match_indent = true
 payload = '''if card.ability.set == 'Booster' and not nosave and G.STATE == SMODS.STATES.SHOP then'''
+
+# functions/button_callbacks.lua : G.FUNCS.use_card() : update logic
+[[patches]]
+[patches.pattern]
+target = 'functions/button_callbacks.lua'
+pattern = '''(self.config.type == 'hand' and ({[G.STATES.SHOP]=1, [G.STATES.TAROT_PACK]=1, [G.STATES.SPECTRAL_PACK]=1, [G.STATES.STANDARD_PACK]=1,[G.STATES.BUFFOON_PACK]=1,[G.STATES.PLANET_PACK]=1, [G.STATES.ROUND_EVAL]=1, [G.STATES.BLIND_SELECT]=1})[state]) or'''
+position = 'at'
+match_indent = true
+payload = '''(self.config.type == 'hand' and ({[SMODS.STATES.SHOP]=1, [G.STATES.TAROT_PACK]=1, [G.STATES.SPECTRAL_PACK]=1, [G.STATES.STANDARD_PACK]=1,[G.STATES.BUFFOON_PACK]=1,[G.STATES.PLANET_PACK]=1, [SMODS.STATES.ROUND_EVAL]=1, [SMODS.STATES.BLIND_SELECT]=1})[state]) or'''
