@@ -4126,7 +4126,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
     }
 
     -------------------------------------------------------------------------------------------------
-    ----- API CODE SMODS.GameState
+    ----- API IMPORT GameObject.GameState
     -------------------------------------------------------------------------------------------------
 
     assert(load(SMODS.NFS.read(SMODS.path..'src/game_objects/game_states.lua'), ('=[SMODS _ "src/game_objects/game_states.lua"]')))()

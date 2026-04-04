@@ -15,8 +15,7 @@ function SMODS.get_current_state()
 end
 
 function SMODS.push_to_state_stack(state, args)
-    local data = SMODS.GameStates[state] and SMODS.GameStates[state].store_to_stack()
-    table.insert(SMODS.state_stack, {state=state, args=args, data=data})
+    table.insert(SMODS.state_stack, {state=state, args=args})
 end
 
 function SMODS.pop_from_state_stack(state)
@@ -103,7 +102,6 @@ SMODS.GameState = SMODS.GameObject:extend{
     on_enter = function (self, args) end,
     on_exit = function (self, args) end,
     update = function (self, dt) end,
-    store_to_stack = function () end, -- Called when SMODS.push_to_state_stack() is called for this GameState, allows returning thus storing per-instance state data, to restore when e.g. re-entering from being held.
     ease_background_colour = nil, -- function
     exit_after_use_card = false, -- Used for consumable states like SMODS.STATES.REDEEM_VOUCHER
     exit_after_end_consumable = false, -- Used for booster-like states like SMODS.STATES.BOOSTER_OPENED
@@ -127,7 +125,7 @@ SMODS.GameState {
     on_enter = function (self, args)
         if args.from_hold then
             -- Extracted from G.FUNCS.use_card()
-            -- Todo : Make better
+            -- Todo : Store data to and restore data from SMODS.state_stack
             if G.shop then 
                 G.shop.alignment.offset.y = G.shop.alignment.offset.py
                 G.shop.alignment.offset.py = nil
