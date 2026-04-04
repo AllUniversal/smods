@@ -4168,39 +4168,54 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         if G.round_eval and not exempt_map[SMODS.STATES.ROUND_EVAL] then G.round_eval:remove(); G.round_eval = nil end
     end
 
-    function SMODS.enter_state(state, args, do_hold_state)
+    function SMODS.enter_state(state, enter_args, exit_args)
         local previous_state = SMODS.STATE or G.STATE -- It only handles on_exit() and on_enter() for SMODS.GameState states
         if previous_state == state then return end
+        enter_args = enter_args or {}
+        exit_args = exit_args or {}
+        exit_args.new_state = exit_args.new_state or state
         if SMODS.GameStates[previous_state] then
-            SMODS.GameStates[previous_state]:on_exit({new_state=state}, do_hold_state)
-            if not do_hold_state then
+            SMODS.GameStates[previous_state]:on_exit(exit_args)
+            if not exit_args.from_hold then
                 SMODS.pop_from_state_stack(previous_state)
             end
         end
         G.STATE = state
         if SMODS.GameStates[state] then
             SMODS.STATE = state
-            SMODS.GameStates[state]:on_enter(args)
-            SMODS.push_to_state_stack(state, args)
+            SMODS.GameStates[state]:on_enter(enter_args)
+            SMODS.push_to_state_stack(state, enter_args)
         end
     end
 
-    function SMODS.exit_state(args, default_state_override)
+    function SMODS.exit_state(exit_args, enter_args, default)
         local current_state = SMODS.STATE or G.STATE
+        local new_state
+        if #SMODS.state_stack < 1 then
+            new_state = default.state_override or SMODS.default_state
+        else
+            new_state = SMODS.state_stack[#SMODS.state_stack].state
+        end
+        exit_args = exit_args or {}
+        exit_args.new_state = exit_args.new_state or new_state
+        enter_args = enter_args or {}
+        enter_args.from_hold = true
+        default = default or {}
+        default.enter_args = default.enter_args or {}
         if SMODS.GameStates[current_state] then
-            SMODS.GameStates[current_state]:on_exit(args)
+            SMODS.GameStates[current_state]:on_exit(exit_args)
             SMODS.pop_from_state_stack(current_state)
         end
         if #SMODS.state_stack < 1 then
             G.STATE = nil
             SMODS.STATE = nil
-            SMODS.enter_state(default_state_override or SMODS.default_state)
+            SMODS.enter_state(new_state, default.enter_args)
             return
         end
-        G.STATE = SMODS.state_stack[#SMODS.state_stack].state
+        G.STATE = new_state
         if SMODS.GameStates[G.STATE] then
             SMODS.STATE = G.STATE
-            SMODS.GameStates[G.STATE]:on_enter(args, true)
+            SMODS.GameStates[G.STATE]:on_enter(enter_args)
         end
     end
 
@@ -4223,8 +4238,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         inject = function (self, i)
             
         end,
-        on_enter = function (self, args, from_hold) end,
-        on_exit = function (self, args, from_hold) end,
+        on_enter = function (self, args) end,
+        on_exit = function (self, args) end,
         update = function (self, dt) end,
         ease_background_colour = nil, -- function
         exit_after_use_card = false, -- Used for consumable states like SMODS.STATES.REDEEM_VOUCHER
@@ -4246,9 +4261,10 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     SMODS.GameState {
         key = SMODS.STATES.SHOP,
-        on_enter = function (self, args, from_hold)
-            if from_hold then
+        on_enter = function (self, args)
+            if args.from_hold then
                 -- Extracted from G.FUNCS.use_card()
+                -- Todo : Make better
                 if G.shop then 
 					G.shop.alignment.offset.y = G.shop.alignment.offset.py
 					G.shop.alignment.offset.py = nil
@@ -4375,8 +4391,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 end
             }))
         end,
-        on_exit = function (self, args, from_hold)
-            if from_hold then
+        on_exit = function (self, args)
+            if args.from_hold then
                 if G.shop and not G.shop.alignment.offset.py then
                     G.shop.alignment.offset.py = G.shop.alignment.offset.y
                     G.shop.alignment.offset.y = G.ROOM.T.y + 29
@@ -4428,8 +4444,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     SMODS.GameState {
         key = SMODS.STATES.ROUND_EVAL,
-        on_enter = function (self, args, from_hold)
-            if from_hold then
+        on_enter = function (self, args)
+            if args.from_hold then
                 if G.round_eval then
 					G.round_eval.alignment.offset.y = G.round_eval.alignment.offset.py
 					G.round_eval.alignment.offset.py = nil
@@ -4474,8 +4490,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 end
             }))
         end,
-        on_exit = function (self, args, from_hold)
-            if from_hold then
+        on_exit = function (self, args)
+            if args.from_hold then
                 if G.round_eval and not G.round_eval.alignment.offset.py then
                     G.round_eval.alignment.offset.py = G.round_eval.alignment.offset.y
                     G.round_eval.alignment.offset.y = G.ROOM.T.y + 29
@@ -4527,7 +4543,11 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     SMODS.GameState {
         key = SMODS.STATES.BLIND,
-        on_enter = function (self, args, from_hold)
+        on_enter = function (self, args)
+            if args.from_hold then
+                -- Todo: Implement 
+                return
+            end
             G.E_MANAGER:add_event(Event({
                 trigger = "immediate",
                 func = function ()
@@ -4561,49 +4581,56 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 end
             }))
         end,
-        on_exit = function (self, args, from_hold)
+        on_exit = function (self, args)
             G.GAME.facing_blind = nil
-            if not from_hold then
-                -- Taken from G.FUNCS.evaluate_round(), defeats blind
-                -- The extra nested immediate events should hopefully preserve the vanilla timing
-                G.E_MANAGER:add_event(Event({
-                    trigger = "immediate",
-                    func = function ()
-                        G.E_MANAGER:add_event(Event({
-                            trigger = "immediate",
-                            func = function ()
-                                G.E_MANAGER:add_event(Event({
-                                    trigger = "immediate",
-                                    blocking = false,
-                                    func = function ()
-                                        if not G.round_eval or (G.round_eval.alignment.offset.y == -7.8 and math.abs(G.round_eval.T.y - G.round_eval.VT.y) < 3) then
-                                            G.E_MANAGER:add_event(Event({
-                                                trigger = "immediate",
-                                                func = function ()
-                                                    G.E_MANAGER:add_event(Event({
-                                                        trigger = 'before',
-                                                        delay = 1.3*math.min(G.GAME.blind.dollars+2, 7)/2*0.15 + 0.5,
-                                                        func = function()
-                                                            G.GAME.blind:defeat()
-                                                            return true
-                                                        end
-                                                    }))
-                                                    delay(0.2)
-                                                    return true
-                                                end
-                                            }))
+            if args.no_defeat then -- Example: SMODS.enter_state(SMODS.STATES.SHOP, nil, {no_defeat = true}) -> This opens the shop without defeating the blind or holding SMODS.STATES.BLIND
+                -- Todo: implement this
+                return
+            end
+            if args.from_hold then
+                -- Todo: implement holding SMODS.STATES.BLIND
+                return
+            end
+            G.E_MANAGER:add_event(Event({
+                trigger = "immediate",
+                blocking = false,
+                func = function ()
+                    if args.new_state == SMODS.STATES.ROUND_EVAL then -- Precise vanilla timing
+                        if G.round_eval and G.round_eval.alignment.offset.y == -7.8 and math.abs(G.round_eval.T.y - G.round_eval.VT.y) < 3 then
+                            G.E_MANAGER:add_event(Event({
+                                trigger = "immediate",
+                                func = function ()
+                                    G.E_MANAGER:add_event(Event({
+                                        trigger = 'before',
+                                        delay = 1.3*math.min(G.GAME.blind.dollars+2, 7)/2*0.15 + 0.5,
+                                        func = function()
+                                            G.GAME.blind:defeat()
                                             return true
                                         end
-                                    end,
-                                }))
+                                    }))
+                                    delay(0.2)
+                                    return true
+                                end
+                            }))
+                            return true
+                        end
+                    else
+                        G.FUNCS.draw_from_hand_to_discard()
+                        G.FUNCS.draw_from_discard_to_deck()
+                        G.E_MANAGER:add_event(Event({
+                            trigger = "after",
+                            blockable = false,
+                            delay = 0.7,
+                            func = function ()
+                                G.GAME.blind:defeat()
                                 return true
                             end
                         }))
+                        delay(0.4)
                         return true
                     end
-                }))
-            end
-
+                end
+            }))
         end,
         ease_background_colour = function (self, blind_override)
             local blindname = ((blind_override or (G.GAME.blind and G.GAME.blind.name ~= '' and G.GAME.blind.name)) or 'Small Blind')
@@ -4625,8 +4652,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     SMODS.GameState {
         key = SMODS.STATES.BLIND_SELECT,
-        on_enter = function (self, args, from_hold)
-            if from_hold then
+        on_enter = function (self, args)
+            if args.from_hold then
                 if G.blind_select then
 					G.blind_select.alignment.offset.y = G.blind_select.alignment.offset.py
 					G.blind_select.alignment.offset.py = nil
@@ -4669,8 +4696,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 end
             }))
         end,
-        on_exit = function (self, args, from_hold)
-            if from_hold then
+        on_exit = function (self, args)
+            if args.from_hold then
                 if G.blind_select and not G.blind_select.alignment.offset.py then
                     G.blind_select.alignment.offset.py = G.blind_select.alignment.offset.y
                     G.blind_select.alignment.offset.y = G.ROOM.T.y + 39

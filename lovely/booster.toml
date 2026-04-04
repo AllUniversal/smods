@@ -34,7 +34,7 @@ payload = """
 booster_obj = self.config.center
 if booster_obj and SMODS.Centers[booster_obj.key] then
     SMODS.OPENED_BOOSTER = self
-    SMODS.enter_state(SMODS.STATES.BOOSTER_OPENED, nil, true)
+    SMODS.enter_state(SMODS.STATES.BOOSTER_OPENED, nil, {from_hold = true})
 end
 G.GAME.pack_choices = math.min((self.ability.choose or self.config.center.config.choose or 1) + (G.GAME.modifiers.booster_choice_mod or 0), self.ability.extra and math.max(1, self.ability.extra + (G.GAME.modifiers.booster_size_mod or 0)) or self.config.center.extra and math.max(1, self.config.center.extra + (G.GAME.modifiers.booster_size_mod or 0)) or 1)
 """
@@ -206,4 +206,4 @@ target = 'card.lua'
 match_indent = true
 position = 'after'
 pattern = '''if self.shop_voucher then G.GAME.current_round.voucher = nil end'''
-payload = '''SMODS.enter_state(SMODS.STATES.REDEEM_VOUCHER, nil, true)'''
+payload = '''SMODS.enter_state(SMODS.STATES.REDEEM_VOUCHER, nil, {from_hold = true})'''
