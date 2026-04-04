@@ -33,8 +33,8 @@ position = "at"
 payload = """
 booster_obj = self.config.center
 if booster_obj and SMODS.Centers[booster_obj.key] then
-    G.STATE = G.STATES.SMODS_BOOSTER_OPENED
     SMODS.OPENED_BOOSTER = self
+    SMODS.enter_state(SMODS.STATES.BOOSTER_OPENED)
 end
 G.GAME.pack_choices = math.min((self.ability.choose or self.config.center.config.choose or 1) + (G.GAME.modifiers.booster_choice_mod or 0), self.ability.extra and math.max(1, self.ability.extra + (G.GAME.modifiers.booster_size_mod or 0)) or self.config.center.extra and math.max(1, self.config.center.extra + (G.GAME.modifiers.booster_size_mod or 0)) or 1)
 """

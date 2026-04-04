@@ -422,15 +422,6 @@ pattern = 'if G\.GAME\.blind then'
 position = "at"
 payload = "if G.GAME.blind and G.GAME.blind.in_blind and not self.from_quantum then"
 
-# end_round()
-[[patches]]
-[patches.pattern]
-target = "functions/state_events.lua"
-pattern = "local game_over = true"
-position = "before"
-payload = "G.GAME.blind.in_blind = false"
-match_indent = true
-
 # Allow winning game if winning ante is skipped
 [[patches]]
 [patches.pattern]
