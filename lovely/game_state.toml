@@ -54,3 +54,73 @@ pattern = '''(self.config.type == 'hand' and ({[G.STATES.SHOP]=1, [G.STATES.TARO
 position = 'at'
 match_indent = true
 payload = '''(self.config.type == 'hand' and ({[SMODS.STATES.SHOP]=1, [G.STATES.TAROT_PACK]=1, [G.STATES.SPECTRAL_PACK]=1, [G.STATES.STANDARD_PACK]=1,[G.STATES.BUFFOON_PACK]=1,[G.STATES.PLANET_PACK]=1, [SMODS.STATES.ROUND_EVAL]=1, [SMODS.STATES.BLIND_SELECT]=1})[state]) or'''
+
+# functions/button_callbacks.lua : G.FUNCS.use_card() : update logic
+[[patches]]
+[patches.pattern]
+target = 'functions/button_callbacks.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+if card.ability.set == 'Booster' and not nosave and G.STATE == G.STATES.SHOP
+'''
+payload = '''
+if card.ability.set == 'Booster' and not nosave and G.STATE == SMODS.STATES.SHOP
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/button_callbacks.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+if G.shop and not G.shop.alignment.offset.py then
+    G.shop.alignment.offset.py = G.shop.alignment.offset.y
+    G.shop.alignment.offset.y = G.ROOM.T.y + 29
+end
+if G.blind_select and not G.blind_select.alignment.offset.py then
+    G.blind_select.alignment.offset.py = G.blind_select.alignment.offset.y
+    G.blind_select.alignment.offset.y = G.ROOM.T.y + 39
+end
+if G.round_eval and not G.round_eval.alignment.offset.py then
+    G.round_eval.alignment.offset.py = G.round_eval.alignment.offset.y
+    G.round_eval.alignment.offset.y = G.ROOM.T.y + 29
+end
+'''
+payload = '''
+
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/button_callbacks.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+if G.shop then 
+    G.shop.alignment.offset.y = G.shop.alignment.offset.py
+    G.shop.alignment.offset.py = nil
+end
+if G.blind_select then
+    G.blind_select.alignment.offset.y = G.blind_select.alignment.offset.py
+    G.blind_select.alignment.offset.py = nil
+end
+if G.round_eval then
+    G.round_eval.alignment.offset.y = G.round_eval.alignment.offset.py
+    G.round_eval.alignment.offset.py = nil
+end
+'''
+payload = '''
+
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/button_callbacks.lua'
+match_indent = true
+position = 'at'
+pattern = '''G.STATE = prev_state'''
+payload = '''
+if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].exit_after_use_card then -- SMODS.STATES.BOOSTER_OPENED is handled by G.FUNCS.end_consumeable() below
+    SMODS.exit_state(nil, nil, {state_override=prev_state})
+elseif not SMODS.GameStates[G.STATE] then
+    G.STATE = prev_state
+end
+'''
