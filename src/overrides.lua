@@ -2783,7 +2783,7 @@ function end_round()
 			-- context.end_of_round calculations
 			SMODS.saved = false
 			G.GAME.saved_text = nil
-			SMODS.calculate_context({end_of_round = true, game_over = game_over, beat_boss = G.GAME.blind.boss })
+			SMODS.calculate_context({end_of_round = true, game_over = game_over, beat_boss = G.GAME.blind:is_type("Boss") })
 			if SMODS.saved then game_over = false end
 			-- TARGET: main end_of_round evaluation
 			if G.GAME.round_resets.ante == G.GAME.win_ante and G.GAME.blind:is_type("Boss") then
@@ -2838,11 +2838,9 @@ function end_round()
 						blocking = false,
 						blockable = false,
 						func = (function()
-							if SMODS.GameStates[G.STATE] and SMODS.GameStates[G.STATE].check_win then
-								win_game()
-								G.GAME.won = true
-								return true
-							end
+							win_game()
+							G.GAME.won = true
+							return true
 						end)
 					}))
 				end

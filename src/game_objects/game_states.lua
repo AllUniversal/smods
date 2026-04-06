@@ -59,11 +59,11 @@ function SMODS.clear_state_stack()
 end
 
 function SMODS.enter_state(new_state, enter_args, exit_args)
-    local current_state = SMODS.STATE or G.STATE -- It only handles on_exit() and on_enter() for SMODS.GameState states
+    local current_state = SMODS.STATE or G.STATE
     if current_state == new_state then return end
     enter_args = enter_args or {}
     enter_args.old_state = current_state
-    if SMODS.is_state_in_stack(new_state) then -- If the new_state is currently held in the stack
+    if SMODS.is_state_in_stack(new_state) then
         if not enter_args.force_refresh then
             enter_args.from_hold = true
         end
@@ -158,16 +158,16 @@ function SMODS.clear_state_queue()
 end
 
 
-local _delete_run_clear_state_stuff = function ()
+local delete_run_clear_state_stuff = function ()
     SMODS.STATE = nil
     SMODS.clear_state_stack()
     SMODS.clear_state_queue()
 end
 
-local delete_run_ref = Game.delete_run
+local _delete_run_ref = Game.delete_run
 function Game:delete_run()
-    local ret = delete_run_ref(self)
-    _delete_run_clear_state_stuff()
+    local ret = _delete_run_ref(self)
+    delete_run_clear_state_stuff()
     return ret
 end
 
@@ -407,7 +407,6 @@ SMODS.GameState {
             }))
         end
     end,
-    check_win = true,
 }
 
 SMODS.GameState {
@@ -507,7 +506,6 @@ SMODS.GameState {
         reset_blinds()
         delay(0.6)
     end,
-    check_win = true,
 }
 
 SMODS.GameState {
@@ -702,5 +700,4 @@ SMODS.GameState {
         }))
 
     end,
-    check_win = true,
 }
