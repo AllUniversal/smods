@@ -94,10 +94,10 @@ function SMODS.exit_state(exit_args, enter_args, default)
     local next_held_state = SMODS.get_next_held_state()
     default = default or {}
     default.enter_args = default.enter_args or {}
-    if #SMODS.state_stack < 2 or not next_held_state then
-        new_state = default.state_override or SMODS.default_state
-    else
+    if next_held_state then
         new_state = next_held_state
+    else
+        new_state = default.state_override or SMODS.default_state
     end
     exit_args = exit_args or {}
     exit_args.new_state = exit_args.new_state or new_state
