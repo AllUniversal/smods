@@ -153,12 +153,21 @@ function SMODS.advance_state_queue(instant)
     end
 end
 
+function SMODS.clear_state_queue()
+    SMODS.state_queue = {}
+end
+
+
+local _delete_run_clear_state_stuff = function ()
+    SMODS.STATE = nil
+    SMODS.clear_state_stack()
+    SMODS.clear_state_queue()
+end
 
 local delete_run_ref = Game.delete_run
 function Game:delete_run()
     local ret = delete_run_ref(self)
-    SMODS.STATE = nil
-    SMODS.clear_state_stack()
+    _delete_run_clear_state_stuff()
     return ret
 end
 
