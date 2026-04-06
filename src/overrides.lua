@@ -2725,7 +2725,10 @@ end
 -- SMODS.GameState related overrides
 
 function G.FUNCS.toggle_shop(e)
-	SMODS.enter_state(SMODS.STATES.BLIND_SELECT)
+	if #SMODS.state_queue == 0 then
+		SMODS.queue_state(SMODS.STATES.BLIND_SELECT)
+	end
+	SMODS.advance_state_queue()
 end
 
 function G.FUNCS.cash_out(e)
@@ -2735,7 +2738,10 @@ function G.FUNCS.cash_out(e)
 		G.E_MANAGER:add_event(Event({
 			trigger = 'immediate',
 			func = function()
-				SMODS.enter_state(SMODS.STATES.SHOP)
+				if #SMODS.state_queue == 0 then
+					SMODS.queue_state(SMODS.STATES.SHOP)
+				end
+				SMODS.advance_state_queue()
 				G.STATE_COMPLETE = false
 			return true
 			end
@@ -2746,7 +2752,10 @@ end
 function G.FUNCS.select_blind(e)
 	stop_use()
 	if G.blind_select then
-		SMODS.enter_state(SMODS.STATES.BLIND, {key = e.config.ref_table.key})
+		if #SMODS.state_queue == 0 then
+			SMODS.queue_state(SMODS.STATES.BLIND, {key = e.config.ref_table.key})
+		end
+		SMODS.advance_state_queue()
 	end
 end
 
@@ -2862,7 +2871,10 @@ function end_round()
 					trigger = 'after',
 					delay = 0.3,
 					func = function()
-						SMODS.enter_state(SMODS.STATES.ROUND_EVAL)
+						if #SMODS.state_queue == 0 then
+							SMODS.queue_state(SMODS.STATES.ROUND_EVAL)
+						end
+						SMODS.advance_state_queue()
 						G.STATE_COMPLETE = false
 
 						if G.GAME.round_resets.blind == G.P_BLINDS.bl_small then

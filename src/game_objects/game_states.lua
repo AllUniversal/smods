@@ -128,6 +128,32 @@ function SMODS.exit_state(exit_args, enter_args, default)
     end
 end
 
+SMODS.state_queue = {}
+
+function SMODS.queue_state(new_state, enter_args, exit_args)
+    SMODS.state_queue[#SMODS.state_queue+1] = {state = new_state, enter_args = enter_args, exit_args = exit_args}
+end
+
+function SMODS.advance_state_queue(instant)
+    if #SMODS.state_queue < 1 then
+        return
+    end
+    local func = function()
+        local queue_table = table.remove(SMODS.state_queue, 1)
+        SMODS.enter_state(queue_table.state, queue_table.enter_args, queue_table.exit_args)
+        return true
+    end
+    if instant then
+        func()
+    else
+        G.E_MANAGER:add_event(Event({
+            trigger = "immediate",
+            func = func
+        }))
+    end
+end
+
+
 local delete_run_ref = Game.delete_run
 function Game:delete_run()
     local ret = delete_run_ref(self)
