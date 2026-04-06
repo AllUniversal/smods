@@ -18,11 +18,40 @@ function SMODS.push_to_state_stack(state, args)
     table.insert(SMODS.state_stack, {state=state, args=args})
 end
 
-function SMODS.pop_from_state_stack(state)
+function SMODS.pop_from_state_stack(state, pop_duplicate)
     if #SMODS.state_stack < 1 then return end
-    if SMODS.state_stack[#SMODS.state_stack].state == state then
-        table.remove(SMODS.state_stack, #SMODS.state_stack)
+    pop_duplicate = pop_duplicate == nil or pop_duplicate
+    local index = #SMODS.state_stack
+    while index > 0 and SMODS.state_stack[index].state == state do
+        table.remove(SMODS.state_stack, index)
+        index = index - 1
+        if not pop_duplicate then
+            index = 0
+        end
     end
+end
+
+function SMODS.get_previous_state(allow_duplicate)
+    local index = #SMODS.state_stack - 1
+    while index > 0 and SMODS.state_stack[index].state ~= SMODS.STATE do
+        index = index - 1
+        if allow_duplicate or SMODS.state_stack[index].state ~= SMODS.STATE then
+            return SMODS.state_stack[index].state
+        end
+    end
+    return nil
+end
+
+function SMODS.is_state_in_stack(state, exclude_latest)
+    for i, state_table in ipairs(SMODS.state_stack) do
+        if exclude_latest and i == #SMODS.state_stack then
+            return false
+        end
+        if state_table.state == state then
+            return true
+        end
+    end
+    return false
 end
 
 function SMODS.clear_state_stack()
@@ -33,11 +62,21 @@ function SMODS.enter_state(new_state, enter_args, exit_args)
     local current_state = SMODS.STATE or G.STATE -- It only handles on_exit() and on_enter() for SMODS.GameState states
     if current_state == new_state then return end
     enter_args = enter_args or {}
+    enter_args.old_state = current_state
+    if SMODS.is_state_in_stack(new_state) then -- If the new_state is currently held in the stack
+        if not enter_args.force_refresh then
+            enter_args.from_hold = true
+        end
+    end 
     exit_args = exit_args or {}
     exit_args.new_state = exit_args.new_state or new_state
+    local exit_state_in_stack = SMODS.is_state_in_stack(current_state, true)
+    if exit_state_in_stack then
+        exit_args.from_hold = true
+    end
     if SMODS.GameStates[current_state] then
         SMODS.GameStates[current_state]:on_exit(exit_args)
-        if not exit_args.from_hold then
+        if not exit_args.from_hold or exit_state_in_stack then
             SMODS.pop_from_state_stack(current_state)
         end
     end
@@ -52,17 +91,25 @@ end
 function SMODS.exit_state(exit_args, enter_args, default)
     local current_state = SMODS.STATE or G.STATE
     local new_state
-    if #SMODS.state_stack < 2 then
+    default = default or {}
+    default.enter_args = default.enter_args or {}
+    if #SMODS.state_stack < 2 or not SMODS.get_previous_state() then
         new_state = default.state_override or SMODS.default_state
     else
         new_state = SMODS.state_stack[#SMODS.state_stack - 1].state
     end
     exit_args = exit_args or {}
     exit_args.new_state = exit_args.new_state or new_state
+    if SMODS.is_state_in_stack(current_state, true) then
+        exit_args.from_hold = true
+    end
     enter_args = enter_args or {}
-    enter_args.from_hold = true
-    default = default or {}
-    default.enter_args = default.enter_args or {}
+    enter_args.old_state = current_state
+    if SMODS.is_state_in_stack(new_state) then
+        if not enter_args.force_refresh then
+            enter_args.from_hold = true
+        end
+    end 
     if SMODS.GameStates[current_state] then
         SMODS.GameStates[current_state]:on_exit(exit_args)
         SMODS.pop_from_state_stack(current_state)
@@ -123,13 +170,35 @@ SMODS.GameState {
 SMODS.GameState {
     key = SMODS.STATES.SHOP,
     on_enter = function (self, args)
-        if args.from_hold then
-            -- Extracted from G.FUNCS.use_card()
+        if args.force_refresh then
+            self:on_exit({})
+        elseif args.from_hold then
             -- Todo : Store data to and restore data from SMODS.state_stack
             if G.shop then 
+                -- Extracted from G.FUNCS.use_card()
                 G.shop.alignment.offset.y = G.shop.alignment.offset.py
                 G.shop.alignment.offset.py = nil
                 G.SHOP_SIGN.alignment.offset.y = 0
+
+                G.E_MANAGER:add_event(Event({
+                    trigger = 'after',
+                    delay = 0.2,
+                    blockable = false,
+                    func = function()
+                        if math.abs(G.shop.T.y - G.shop.VT.y) < 3 then
+                            G.ROOM.jiggle = G.ROOM.jiggle + 3
+                            play_sound('cardFan2')
+                            for i = 1, #G.GAME.tags do
+                                G.GAME.tags[i]:apply_to_run({type = 'shop_start'})
+                            end
+                            return true
+                        end
+                    end
+                }))
+
+                SMODS.calculate_context({starting_shop = true, from_hold = true})
+                G.CONTROLLER:snap_to({node = G.shop:get_UIE_by_ID('next_round_button')})
+                G.E_MANAGER:add_event(Event({ func = function() save_run(); return true end}))
             end
             return
         end
@@ -258,6 +327,7 @@ SMODS.GameState {
                 G.shop.alignment.offset.py = G.shop.alignment.offset.y
                 G.shop.alignment.offset.y = G.ROOM.T.y + 29
                 G.SHOP_SIGN.alignment.offset.y = -15
+                delay(0.5)
             end
             return
         end
@@ -307,7 +377,9 @@ SMODS.GameState {
 SMODS.GameState {
     key = SMODS.STATES.ROUND_EVAL,
     on_enter = function (self, args)
-        if args.from_hold then
+        if args.force_refresh then
+            self:on_exit({})
+        elseif args.from_hold then
             if G.round_eval then
                 G.round_eval.alignment.offset.y = G.round_eval.alignment.offset.py
                 G.round_eval.alignment.offset.py = nil
@@ -405,7 +477,9 @@ SMODS.GameState {
 SMODS.GameState {
     key = SMODS.STATES.BLIND,
     on_enter = function (self, args)
-        if args.from_hold then
+        if args.force_refresh then
+            self:on_exit({})
+        elseif args.from_hold then
             -- Todo: Implement 
             return
         end
@@ -414,7 +488,6 @@ SMODS.GameState {
             func = function ()
                 stop_use()
                 G.GAME.facing_blind = true
-
                 G.E_MANAGER:add_event(Event({
                     trigger = 'immediate',
                     func = function()
@@ -455,7 +528,7 @@ SMODS.GameState {
             trigger = "immediate",
             blocking = false,
             func = function ()
-                if args.new_state == SMODS.STATES.ROUND_EVAL then -- Precise vanilla timing
+                if args.new_state == SMODS.STATES.ROUND_EVAL then -- Precise vanilla timing -> called from end_round()
                     if G.round_eval and G.round_eval.alignment.offset.y == -7.8 and math.abs(G.round_eval.T.y - G.round_eval.VT.y) < 3 then
                         G.E_MANAGER:add_event(Event({
                             trigger = "immediate",
@@ -486,6 +559,10 @@ SMODS.GameState {
                             return true
                         end
                     }))
+                    for k, v in ipairs(G.playing_cards) do
+                        v.ability.discarded = nil
+                        v.ability.forced_selection = nil
+                    end
                     delay(0.4)
                     return true
                 end
@@ -513,7 +590,9 @@ SMODS.GameState {
 SMODS.GameState {
     key = SMODS.STATES.BLIND_SELECT,
     on_enter = function (self, args)
-        if args.from_hold then
+        if args.force_refresh then
+            self:on_exit({})
+        elseif args.from_hold then
             if G.blind_select then
                 G.blind_select.alignment.offset.y = G.blind_select.alignment.offset.py
                 G.blind_select.alignment.offset.py = nil
