@@ -34,10 +34,10 @@ end
 function SMODS.get_next_held_state(allow_duplicate)
     local index = #SMODS.state_stack - 1
     while index > 0 and SMODS.state_stack[index].state ~= SMODS.STATE do
-        index = index - 1
         if allow_duplicate or SMODS.state_stack[index].state ~= SMODS.STATE then
             return SMODS.state_stack[index].state
         end
+        index = index - 1
     end
     return nil
 end
