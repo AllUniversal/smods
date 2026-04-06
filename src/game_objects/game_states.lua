@@ -31,7 +31,7 @@ function SMODS.pop_from_state_stack(state, pop_duplicate)
     end
 end
 
-function SMODS.get_previous_state(allow_duplicate)
+function SMODS.get_next_held_state(allow_duplicate)
     local index = #SMODS.state_stack - 1
     while index > 0 and SMODS.state_stack[index].state ~= SMODS.STATE do
         index = index - 1
@@ -91,12 +91,13 @@ end
 function SMODS.exit_state(exit_args, enter_args, default)
     local current_state = SMODS.STATE or G.STATE
     local new_state
+    local next_held_state = SMODS.get_next_held_state()
     default = default or {}
     default.enter_args = default.enter_args or {}
-    if #SMODS.state_stack < 2 or not SMODS.get_previous_state() then
+    if #SMODS.state_stack < 2 or not next_held_state then
         new_state = default.state_override or SMODS.default_state
     else
-        new_state = SMODS.state_stack[#SMODS.state_stack - 1].state
+        new_state = next_held_state
     end
     exit_args = exit_args or {}
     exit_args.new_state = exit_args.new_state or new_state
