@@ -1833,28 +1833,6 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             return self.blind_types
         end
     }
-    --[[
-        blind_states and loc_blind_states
-
-        Game:update(dt) -> This;
-            if G.prev_small_state ~= G.GAME.round_resets.blind_states.Small or
-            G.prev_large_state ~= G.GAME.round_resets.blind_states.Big or
-            G.prev_boss_state ~= G.GAME.round_resets.blind_states.Boss or G.RESET_BLIND_STATES then ...
-        can probably be ignored and replaced with own system
-            
-        Game:start_run() -> get_next_tag_key() is called, besides that; blind_states is set
-    ]]
-    function reset_blinds()
-        G.GAME.round_resets.blind_states = G.GAME.round_resets.blind_states or {Small = 'Select', Big = 'Upcoming', Boss = 'Upcoming'}
-        if G.GAME.round_resets.blind_states.Boss == 'Defeated' then
-            G.GAME.round_resets.blind_states.Small = 'Upcoming'
-            G.GAME.round_resets.blind_states.Big = 'Upcoming'
-            G.GAME.round_resets.blind_states.Boss = 'Upcoming'
-            G.GAME.blind_on_deck = 'Small'
-            G.GAME.round_resets.blind_choices.Boss = SMODS.get_new_blind({Boss = true})
-            G.GAME.round_resets.boss_rerolled = false
-        end
-    end
 
     function SMODS.get_blind_types(blind_obj)
         local ret
