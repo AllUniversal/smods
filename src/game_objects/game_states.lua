@@ -636,7 +636,6 @@ SMODS.GameState {
                 G.HUD_blind.alignment.offset.py = G.HUD_blind.alignment.offset.y
                 G.HUD_blind.alignment.offset.y = -10
             end
-            -- Todo : This should be made serializable, specifically hand_cards and discarded_cards
             local data = {
                 blind_key = G.GAME.blind.config.blind.key,
                 hand_cards = {},
