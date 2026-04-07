@@ -1866,7 +1866,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     function SMODS.get_new_blind(blind_types)
         -- Use SMODS object weight system when enabled
-        if SMODS.optional_features.object_weights then return SMODS.poll_object({type = 'Blind'}) end
+        if SMODS.optional_features.object_weights then return SMODS.poll_object({type = 'Blind', blind_types = blind_types}) end
         if not blind_types or (blind_types.Boss or blind_types.Showdown) then
             G.GAME.perscribed_bosses = G.GAME.perscribed_bosses or {}
             if G.GAME.perscribed_bosses and G.GAME.perscribed_bosses[G.GAME.round_resets.ante] then
@@ -1883,9 +1883,10 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
             local res = SMODS.add_to_pool(v)
             if res then
                 local b_types = SMODS.get_blind_types(v)
+                local blind_config = v.boss or (table_length(b_types) == 1 and next(b_types)) or {}
                 for b_type, _ in pairs(b_types) do
                     if blind_types[b_type] then
-                        if v.in_pool or not (v.boss and v.boss.min and v.boss.min > math.max(1, G.GAME.round_resets.ante)) then
+                        if v.in_pool or not (blind_config and (blind_config.min and blind_config.min > math.max(1, G.GAME.round_resets.ante) or (blind_config.max or G.GAME.round_resets.ante) >= G.GAME.round_resets.ante)) then
                             eligible_bosses[k] = true
                             break
                         end
