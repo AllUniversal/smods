@@ -1859,7 +1859,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     function get_new_boss()
         -- sendWarnMessage("get_new_boss() is deprecated; Call SMODS.get_new_blind() instead.", "utils")
-        local boss = SMODS.get_new_blind({Boss = true})
+        local b_types = G.GAME.round_resets.ante % G.GAME.win_ante == 0 and {Showdown = true} or {Boss = true}
+        local boss = SMODS.get_new_blind(b_types)
         return boss
     end
 
@@ -1884,7 +1885,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 local b_types = SMODS.get_blind_types(v)
                 for b_type, _ in pairs(b_types) do
                     if blind_types[b_type] then
-                        if v.in_pool or not v.boss or (v.boss.min <= math.max(1, G.GAME.round_resets.ante) and ((math.max(1, G.GAME.round_resets.ante))%G.GAME.win_ante ~= 0 or G.GAME.round_resets.ante < 2)) then
+                        if v.in_pool or not (v.boss and v.boss.min and v.boss.min > math.max(1, G.GAME.round_resets.ante)) then
                             eligible_bosses[k] = true
                             break
                         end
