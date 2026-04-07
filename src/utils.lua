@@ -2985,7 +2985,7 @@ end
 
 local game_start_run = Game.start_run
 function Game:start_run(args)
-    game_start_run(self, args)
+    local ret = game_start_run(self, args)
     G.SCORE_DISPLAY_QUEUE = nil
     G.E_MANAGER:add_event(Event({
         trigger = 'immediate',
@@ -2994,6 +2994,21 @@ function Game:start_run(args)
             return true
         end
     }))
+    G.E_MANAGER:add_event(Event({
+        trigger = 'immediate',
+        func = function()
+            if args.save_text and args.save_text.SMODS then
+                local state_data = args.save_text.SMODS.state_data
+                if state_data then
+                    SMODS.STATE = state_data.STATE
+                    SMODS.state_stack = state_data.state_stack or {}
+                    SMODS.state_queue = state_data.state_queue or {}
+                end
+            end
+            return true
+        end
+    }))
+    return ret
 end
 
 G.FUNCS.SMODS_scoring_calculation_function = function(e)
@@ -3800,10 +3815,15 @@ function save_run()
     smods_hook_save_run()
     if SMODS.last_hand and G.culled_table then
         G.culled_table.SMODS = {
-        last_hand = {
+            last_hand = {
                 scoring_name = SMODS.last_hand.scoring_name,
                 scoring_hand = {},
                 full_hand = {}
+            },
+            state_data = {
+                STATE = SMODS.STATE,
+                state_stack = recursive_table_cull(SMODS.state_stack),
+                state_queue = recursive_table_cull(SMODS.state_queue),
             }
         }
     end
@@ -4062,4 +4082,12 @@ end
 -- Simple unlock text function, created to give mod authors an option to hook rather than patch for their use cases.
 function SMODS.create_unlock_text(center)
 	return localize('k_'..string.lower(center and center.set or 'unknown'))
+end
+
+function SMODS.get_card_by_sort_id(sort_id)
+    for _, pcard in ipairs(G.playing_card) do
+        if pcard.sort_id == sort_id then
+            return pcard
+        end
+    end
 end

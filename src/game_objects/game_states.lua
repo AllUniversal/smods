@@ -61,6 +61,7 @@ end
 function SMODS.enter_state(new_state, enter_args, exit_args)
     local current_state = SMODS.STATE or G.STATE
     if current_state == new_state then return end
+    local next_held_state = SMODS.get_next_held_state()
     enter_args = enter_args or {}
     enter_args.old_state = current_state
     if SMODS.is_state_in_stack(new_state) then
@@ -70,7 +71,7 @@ function SMODS.enter_state(new_state, enter_args, exit_args)
     end 
     exit_args = exit_args or {}
     exit_args.new_state = exit_args.new_state or new_state
-    local exit_state_in_stack = SMODS.is_state_in_stack(current_state, true)
+    local exit_state_in_stack = not exit_args.from_hold and SMODS.is_state_in_stack(current_state, true) -- If exit_args.from_hold is already true, this is irrelevant
     if exit_state_in_stack then
         exit_args.from_hold = true
     end
@@ -83,7 +84,9 @@ function SMODS.enter_state(new_state, enter_args, exit_args)
     G.STATE = new_state
     if SMODS.GameStates[new_state] then
         SMODS.STATE = new_state
-        SMODS.push_to_state_stack(new_state, enter_args)
+        if next_held_state ~= new_state or (exit_args.from_hold and not exit_state_in_stack) then
+            SMODS.push_to_state_stack(new_state, enter_args)
+        end
         SMODS.GameStates[new_state]:on_enter(enter_args)
     end
 end
@@ -358,30 +361,12 @@ SMODS.GameState {
         }))
     end,
     on_exit = function (self, args)
+        G.CONTROLLER.locks.toggle_shop = true
         if args.from_hold then
             if G.shop and not G.shop.alignment.offset.py then
                 G.shop.alignment.offset.py = G.shop.alignment.offset.y
                 G.shop.alignment.offset.y = G.ROOM.T.y + 29
                 G.SHOP_SIGN.alignment.offset.y = -15
-                delay(0.5)
-            end
-            return
-        end
-        stop_use()
-        G.CONTROLLER.locks.toggle_shop = true
-        if G.shop then
-            if not from_hold then
-                SMODS.calculate_context({ending_shop = true})
-            end
-            G.E_MANAGER:add_event(Event({
-                trigger = 'immediate',
-                func = function()
-                    G.shop.alignment.offset.y = G.ROOM.T.y + 29
-                    G.SHOP_SIGN.alignment.offset.y = -15
-                    return true
-                end
-            }))
-            if from_hold then
                 G.E_MANAGER:add_event(Event({
                     trigger = 'after',
                     delay = 0.5,
@@ -390,8 +375,20 @@ SMODS.GameState {
                         return true
                     end
                 }))
-                return
             end
+            return
+        end
+        stop_use()
+        if G.shop then
+            SMODS.calculate_context({ending_shop = true})
+            G.E_MANAGER:add_event(Event({
+                trigger = 'immediate',
+                func = function()
+                    G.shop.alignment.offset.y = G.ROOM.T.y + 29
+                    G.SHOP_SIGN.alignment.offset.y = -15
+                    return true
+                end
+            }))
             G.E_MANAGER:add_event(Event({
                 trigger = 'after',
                 delay = 0.5,
@@ -514,7 +511,33 @@ SMODS.GameState {
         if args.force_refresh then
             self:on_exit({})
         elseif args.from_hold then
-            -- Todo: Implement 
+            G.GAME.facing_blind = true
+            local data = SMODS.state_stack[#SMODS.state_stack].data
+            ease_chips(data.chips)
+            G.GAME.blind:set_blind(G.P_BLINDS[data.blind_key], nil, true)
+            G.GAME.blind.chips = data.blind_chips
+            G.GAME.blind.chip_text = number_format(data.blind_chips)
+            ease_hands_played(G.GAME.current_round.hands_left - data.hands_left)
+            G.GAME.current_round.hands_played = data.hands_played
+            ease_discard(G.GAME.current_round.discards_left - data.discards_left)
+            G.GAME.current_round.discards_used = data.discards_used
+            for _, pcard_sort_id in ipairs(data.hand_cards) do
+                local pcard = SMODS.get_card_by_sort_id(pcard_sort_id)
+                if pcard and not pcard.removed then
+                    draw_card(G.deck, G.hand, nil, nil, nil, pcard)
+                    pcard.ability.forced_selection = data.forced_selection[pcard_sort_id]
+                end
+            end
+            for _, pcard_sort_id in ipairs(data.discarded_cards) do
+                local pcard = SMODS.get_card_by_sort_id(pcard_sort_id)
+                if pcard and not pcard.removed then
+                    draw_card(G.deck, G.discard, nil, nil, nil, pcard)
+                    pcard.ability.discarded = true
+                end
+            end
+            save_run()
+            G.STATE = G.STATES.SELECTING_HAND
+            G.CONTROLLER:recall_cardarea_focus('hand')
             return
         end
         G.E_MANAGER:add_event(Event({
@@ -555,7 +578,50 @@ SMODS.GameState {
             return
         end
         if args.from_hold then
-            -- Todo: implement holding SMODS.STATES.BLIND
+            if G.HUD_blind then
+                G.HUD_blind.alignment.offset.py = G.HUD_blind.alignment.offset.y
+                G.HUD_blind.alignment.offset.y = -10
+            end
+            -- Todo : This should be made serializable, specifically hand_cards and discarded_cards
+            local data = {
+                blind_key = G.GAME.blind.config.blind.key,
+                hand_cards = {},
+                forced_selection = {},
+                discarded_cards = {},
+                chips = G.GAME.chips,
+                blind_chips = G.GAME.blind.chips,
+                hands_left = G.GAME.current_round.hands_left,
+                hands_played = G.GAME.current_round.hands_played,
+                discards_left = G.GAME.current_round.discards_left,
+                discards_used = G.GAME.current_round.discards_used,
+            }
+            for _, pcard in ipairs(G.hand.cards) do
+                data.hand_cards[#data.hand_cards+1] = pcard.sort_id
+                if pcard.ability.forced_selection then
+                    data.forced_selection[pcard.sort_id] = true
+                end
+            end
+            for _, pcard in ipairs(G.discard.cards) do
+                data.discarded_cards[#data.discarded_cards+1] = pcard.sort_id
+            end
+            SMODS.state_stack[#SMODS.state_stack].data = data
+            G.FUNCS.draw_from_hand_to_discard()
+            G.FUNCS.draw_from_discard_to_deck()
+            G.E_MANAGER:add_event(Event({
+                trigger = "after",
+                blockable = false,
+                delay = 0.7,
+                func = function ()
+                    G.GAME.blind:disable()
+                    if G.buttons then G.buttons:remove(); G.buttons = nil end         
+                    return true
+                end
+            }))
+            for k, v in ipairs(G.playing_cards) do
+                v.ability.discarded = nil
+                v.ability.forced_selection = nil
+            end
+            delay(0.4)
             return
         end
         G.E_MANAGER:add_event(Event({
@@ -631,6 +697,14 @@ SMODS.GameState {
                 G.blind_select.alignment.offset.y = G.blind_select.alignment.offset.py
                 G.blind_select.alignment.offset.py = nil
             end
+            G.E_MANAGER:add_event(Event({
+                trigger = "after",
+                delay = 0.3,
+                func = function ()
+                    play_sound('cancel')
+                    return true
+                end
+            }))
             return
         end
         G.E_MANAGER:add_event(Event({
