@@ -178,3 +178,55 @@ elseif not SMODS.GameStates[G.STATE] then
     G.STATE = G.GAME.PACK_INTERRUPT
 end
 '''
+
+# functions/state_events.lua : G.FUNCS.evaluate_round() : remove Blind:defeat() call -> moved to SMODS.STATES.BLIND's on_exit() 
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+G.E_MANAGER:add_event(Event({
+    trigger = 'before',
+    delay = 1.3*math.min(G.GAME.blind.dollars+2, 7)/2*0.15 + 0.5,
+    func = function()
+        G.GAME.blind:defeat()
+        return true
+    end
+    }))
+delay(0.2)
+'''
+payload = '''
+-- Blind:defeat() call moved to SMODS.STATES.BLIND's on_exit() 
+'''
+
+# functions/state_events.lua : end_round() : update logic
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+match_indent = true
+position = 'at'
+pattern = '''G.STATE = G.STATES.ROUND_EVAL'''
+payload = '''
+if #SMODS.state_queue == 0 then
+    SMODS.queue_state(SMODS.STATES.ROUND_EVAL)
+end
+SMODS.advance_state_queue()
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+match_indent = true
+position = 'at'
+pattern = '''
+if G.STATE == G.STATES.ROUND_EVAL then 
+    win_game()
+    G.GAME.won = true
+    return true
+end
+'''
+payload = '''
+win_game()
+G.GAME.won = true
+return true
+'''

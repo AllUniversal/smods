@@ -627,37 +627,35 @@ SMODS.GameState {
     end,
     on_exit = function (self, args)
         G.GAME.facing_blind = nil
-        if args.no_defeat then -- Example: SMODS.enter_state(SMODS.STATES.SHOP, nil, {no_defeat = true}) -> This opens the shop without defeating the blind or holding SMODS.STATES.BLIND
-            -- Todo: implement this
-            return
-        end
-        if args.from_hold then
+        if args.from_hold or args.no_defeat then
             if G.HUD_blind then
                 G.HUD_blind.alignment.offset.py = G.HUD_blind.alignment.offset.y
                 G.HUD_blind.alignment.offset.y = -10
             end
-            local data = {
-                blind_key = G.GAME.blind.config.blind.key,
-                hand_cards = {},
-                forced_selection = {},
-                discarded_cards = {},
-                chips = G.GAME.chips,
-                blind_chips = G.GAME.blind.chips,
-                hands_left = G.GAME.current_round.hands_left,
-                hands_played = G.GAME.current_round.hands_played,
-                discards_left = G.GAME.current_round.discards_left,
-                discards_used = G.GAME.current_round.discards_used,
-            }
-            for _, pcard in ipairs(G.hand.cards) do
-                data.hand_cards[#data.hand_cards+1] = pcard.sort_id
-                if pcard.ability.forced_selection then
-                    data.forced_selection[pcard.sort_id] = true
+            if args.from_hold then
+                local data = {
+                    blind_key = G.GAME.blind.config.blind.key,
+                    hand_cards = {},
+                    forced_selection = {},
+                    discarded_cards = {},
+                    chips = G.GAME.chips,
+                    blind_chips = G.GAME.blind.chips,
+                    hands_left = G.GAME.current_round.hands_left,
+                    hands_played = G.GAME.current_round.hands_played,
+                    discards_left = G.GAME.current_round.discards_left,
+                    discards_used = G.GAME.current_round.discards_used,
+                }
+                for _, pcard in ipairs(G.hand.cards) do
+                    data.hand_cards[#data.hand_cards+1] = pcard.sort_id
+                    if pcard.ability.forced_selection then
+                        data.forced_selection[pcard.sort_id] = true
+                    end
                 end
+                for _, pcard in ipairs(G.discard.cards) do
+                    data.discarded_cards[#data.discarded_cards+1] = pcard.sort_id
+                end
+                SMODS.state_stack[#SMODS.state_stack].data = data
             end
-            for _, pcard in ipairs(G.discard.cards) do
-                data.discarded_cards[#data.discarded_cards+1] = pcard.sort_id
-            end
-            SMODS.state_stack[#SMODS.state_stack].data = data
             G.FUNCS.draw_from_hand_to_discard()
             G.FUNCS.draw_from_discard_to_deck()
             G.E_MANAGER:add_event(Event({

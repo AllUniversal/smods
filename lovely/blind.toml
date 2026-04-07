@@ -594,6 +594,34 @@ position = "at"
 payload = '''
 if G.GAME.modifiers.no_blind_reward and (G.GAME.blind and blind:is_types(G.GAME.modifiers.no_blind_reward)) then
 '''
+# functions/state_events.lua : end_round()
+[[patches]]
+[patches.pattern]
+target = "functions/state_events.lua"
+match_indent = true
+pattern = '''if G.GAME.blind:get_type() == 'Boss' and not G.GAME.seeded and not G.GAME.challenge  then'''
+position = "at"
+payload = '''
+if G.GAME.blind:is_type("Boss") and not G.GAME.seeded and not G.GAME.challenge then
+'''
+[[patches]]
+[patches.pattern]
+target = "functions/state_events.lua"
+match_indent = true
+pattern = '''if G.GAME.blind:get_type() == 'Boss' then'''
+position = "at"
+payload = '''
+if G.GAME.blind:is_type("Boss") then
+'''
+[[patches]]
+[patches.pattern]
+target = "functions/state_events.lua"
+match_indent = true
+pattern = '''if not G.GAME.won and G.GAME.round_resets.ante >= G.GAME.win_ante and G.GAME.blind_on_deck == 'Boss' then'''
+position = "at"
+payload = '''
+if G.GAME.round_resets.ante == G.GAME.win_ante and G.GAME.blind:is_type("Boss") then
+'''
 # game.lua : Game:init_game_object()
 [[patches]]
 [patches.regex]
