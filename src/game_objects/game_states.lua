@@ -187,6 +187,7 @@ SMODS.GameState = SMODS.GameObject:extend{
     end,
     on_enter = function (self, args) end,
     on_exit = function (self, args) end,
+    on_load = function (self) end,
     update = function (self, dt) end,
     ease_background_colour = nil, -- function
     exit_after_use_card = false, -- Used for consumable states like SMODS.STATES.REDEEM_VOUCHER
@@ -208,14 +209,57 @@ SMODS.GameState {
 
 SMODS.GameState {
     key = SMODS.STATES.SHOP,
+    on_load = function ()
+        G.shop = G.shop or UIBox{
+            definition = G.UIDEF.shop(),
+            config = {align='tmi', offset = {x=0,y=G.ROOM.T.y+11},major = G.hand, bond = 'Weak'}
+        }
+        G.E_MANAGER:add_event(Event({
+            trigger = 'immediate',
+            func = (function()
+                G.SHOP_SIGN.alignment.offset.y = -15 -- Counteracts the immediate event inside G.UIDEF.shop()
+                return true
+            end)
+        }))
+        
+        if G.load_shop_jokers then 
+            G.shop_jokers:load(G.load_shop_jokers)
+            for k, v in ipairs(G.shop_jokers.cards) do
+                create_shop_card_ui(v)
+                if v.ability.consumeable then v:start_materialize(nil, true) end
+                for _kk, vvv in ipairs(G.GAME.tags) do
+                    if vvv:apply_to_run({type = 'store_joker_modify', card = v}) then break end
+                end
+            end
+            G.load_shop_jokers = nil
+        end
+
+        if G.load_shop_vouchers then
+            G.shop_vouchers:load(G.load_shop_vouchers)
+            for k, v in ipairs(G.shop_vouchers.cards) do
+                create_shop_card_ui(v)
+                v:start_materialize(nil, true)
+            end
+            G.load_shop_vouchers = nil
+        end
+
+        if G.load_shop_booster then 
+            G.shop_booster:load(G.load_shop_booster)
+            for k, v in ipairs(G.shop_booster.cards) do
+                create_shop_card_ui(v)
+                v:start_materialize(nil, true)
+            end
+            G.load_shop_booster = nil
+        end
+    end,
     on_enter = function (self, args)
+        G.CONTROLLER.locks.toggle_shop = nil
         if args.force_refresh then
             self:on_exit({})
         elseif args.from_hold then
-            -- Todo : Store data to and restore data from SMODS.state_stack
             if G.shop then 
                 -- Extracted from G.FUNCS.use_card()
-                G.shop.alignment.offset.y = G.shop.alignment.offset.py
+                G.shop.alignment.offset.y = G.shop.alignment.offset.py or -5.3
                 G.shop.alignment.offset.py = nil
                 G.SHOP_SIGN.alignment.offset.y = 0
 
@@ -238,6 +282,9 @@ SMODS.GameState {
                 SMODS.calculate_context({starting_shop = true, from_hold = true})
                 G.CONTROLLER:snap_to({node = G.shop:get_UIE_by_ID('next_round_button')})
                 G.E_MANAGER:add_event(Event({ func = function() save_run(); return true end}))
+            else
+                args.force_refresh = true
+                self:on_enter(args)
             end
             return
         end
@@ -367,15 +414,15 @@ SMODS.GameState {
                 G.shop.alignment.offset.py = G.shop.alignment.offset.y
                 G.shop.alignment.offset.y = G.ROOM.T.y + 29
                 G.SHOP_SIGN.alignment.offset.y = -15
-                G.E_MANAGER:add_event(Event({
-                    trigger = 'after',
-                    delay = 0.5,
-                    func = function ()
-                        G.CONTROLLER.locks.toggle_shop = nil
-                        return true
-                    end
-                }))
             end
+            G.E_MANAGER:add_event(Event({
+                trigger = 'after',
+                delay = 0.5,
+                func = function ()
+                    G.CONTROLLER.locks.toggle_shop = nil
+                    return true
+                end
+            }))
             return
         end
         stop_use()
@@ -402,6 +449,8 @@ SMODS.GameState {
                     return true
                 end
             }))
+        else 
+            G.CONTROLLER.locks.toggle_shop = false
         end
     end,
 }
@@ -415,7 +464,10 @@ SMODS.GameState {
             if G.round_eval then
                 G.round_eval.alignment.offset.y = G.round_eval.alignment.offset.py
                 G.round_eval.alignment.offset.py = nil
-                end
+            else
+                args.force_refresh = true
+                self:on_enter(args)
+            end
             return
         end
         G.E_MANAGER:add_event(Event({
@@ -521,15 +573,17 @@ SMODS.GameState {
             G.GAME.current_round.hands_played = data.hands_played
             ease_discard(G.GAME.current_round.discards_left - data.discards_left)
             G.GAME.current_round.discards_used = data.discards_used
+            local hand_cards = SMODS.get_cards_by_sort_ids(data.hand_cards)
+            local discarded_cards = SMODS.get_cards_by_sort_ids(data.discarded_cards)
             for _, pcard_sort_id in ipairs(data.hand_cards) do
-                local pcard = SMODS.get_card_by_sort_id(pcard_sort_id)
+                local pcard = hand_cards[pcard_sort_id]
                 if pcard and not pcard.removed then
                     draw_card(G.deck, G.hand, nil, nil, nil, pcard)
                     pcard.ability.forced_selection = data.forced_selection[pcard_sort_id]
                 end
             end
             for _, pcard_sort_id in ipairs(data.discarded_cards) do
-                local pcard = SMODS.get_card_by_sort_id(pcard_sort_id)
+                local pcard = discarded_cards[pcard_sort_id]
                 if pcard and not pcard.removed then
                     draw_card(G.deck, G.discard, nil, nil, nil, pcard)
                     pcard.ability.discarded = true
@@ -696,15 +750,18 @@ SMODS.GameState {
             if G.blind_select then
                 G.blind_select.alignment.offset.y = G.blind_select.alignment.offset.py
                 G.blind_select.alignment.offset.py = nil
+                G.E_MANAGER:add_event(Event({
+                    trigger = "after",
+                    delay = 0.3,
+                    func = function ()
+                        play_sound('cancel')
+                        return true
+                    end
+                }))
+            else
+                args.force_refresh = true
+                self:on_enter(args)
             end
-            G.E_MANAGER:add_event(Event({
-                trigger = "after",
-                delay = 0.3,
-                func = function ()
-                    play_sound('cancel')
-                    return true
-                end
-            }))
             return
         end
         G.E_MANAGER:add_event(Event({

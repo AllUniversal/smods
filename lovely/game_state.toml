@@ -21,7 +21,7 @@ if SMODS.GameStates[self.STATE] then
 end
 '''
 
-# Game:start_run()
+# game.lua : Game:start_run()
 [[patches]]
 [patches.pattern]
 target = 'game.lua'
@@ -33,7 +33,7 @@ self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or G.STATES.BLIND_SE
 payload = '''
 self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or SMODS.STATES.BLIND_SELECT)
 '''
-# Game:prep_stage()
+# game.lua : Game:prep_stage()
 [[patches]]
 [patches.pattern]
 target = 'game.lua'
@@ -45,6 +45,23 @@ self.STATE = new_state or self.STATES.MENU
 payload = '''
 SMODS.enter_state(new_state or SELF.STATES.MENU)
 '''
+
+# game.lua : Game:update_selecting_hand(dt) / Game:update_hand_played(dt) / etc. : Avoid deleting the shop in case it is held in the SMODS.state_stack
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+match_indent = true
+position = 'at'
+pattern = '''if self.shop then self.shop:remove(); self.shop = nil end'''
+payload = ''''''
+[[patches]] # Repatch Game:delete_run()
+[patches.pattern]
+target = 'game.lua'
+match_indent = true
+position = 'after'
+pattern = '''if self.deck_preview then self.deck_preview:remove(); self.deck_preview = nil end'''
+payload = '''if self.shop then self.shop:remove(); self.shop = nil end'''
+
 
 # cardarea.lua : CardArea:draw() : update logic
 [[patches]]

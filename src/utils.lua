@@ -2994,20 +2994,19 @@ function Game:start_run(args)
             return true
         end
     }))
-    G.E_MANAGER:add_event(Event({
-        trigger = 'immediate',
-        func = function()
-            if args.save_text and args.save_text.SMODS then
-                local state_data = args.save_text.SMODS.state_data
-                if state_data then
-                    SMODS.STATE = state_data.STATE
-                    SMODS.state_stack = state_data.state_stack or {}
-                    SMODS.state_queue = state_data.state_queue or {}
+    if args.savetext and args.savetext.SMODS then
+        local state_data = args.savetext.SMODS.state_data
+        if state_data then
+            SMODS.STATE = state_data.STATE
+            SMODS.state_stack = state_data.state_stack or {}
+            SMODS.state_queue = state_data.state_queue or {}
+            for _, state_table in ipairs(SMODS.state_stack) do
+                if SMODS.GameStates[state_table.state] then
+                    SMODS.GameStates[state_table.state]:on_load()
                 end
             end
-            return true
         end
-    }))
+    end
     return ret
 end
 
@@ -3813,19 +3812,21 @@ function save_run()
         end
     end
     smods_hook_save_run()
-    if SMODS.last_hand and G.culled_table then
+    if G.culled_table then
         G.culled_table.SMODS = {
-            last_hand = {
-                scoring_name = SMODS.last_hand.scoring_name,
-                scoring_hand = {},
-                full_hand = {}
-            },
             state_data = {
                 STATE = SMODS.STATE,
                 state_stack = recursive_table_cull(SMODS.state_stack),
                 state_queue = recursive_table_cull(SMODS.state_queue),
             }
         }
+        if SMODS.last_hand then
+            G.culled_table.SMODS.last_hand = {
+                scoring_name = SMODS.last_hand.scoring_name,
+                scoring_hand = {},
+                full_hand = {}
+            }
+        end
     end
 end
 
@@ -4085,9 +4086,27 @@ function SMODS.create_unlock_text(center)
 end
 
 function SMODS.get_card_by_sort_id(sort_id)
-    for _, pcard in ipairs(G.playing_card) do
+    for _, pcard in ipairs(G.playing_cards) do
         if pcard.sort_id == sort_id then
             return pcard
         end
     end
+end
+
+function SMODS.get_cards_by_sort_ids(sort_ids)
+    local sort_ids_map = {}
+    if sort_ids[1] and type(sort_ids[1]) == "number" then
+        for _, sort_id in ipairs(sort_ids) do
+            sort_ids_map[sort_id] = true
+        end
+    else
+        sort_ids_map = sort_ids
+    end
+    local ret = {}
+    for _, pcard in ipairs(G.playing_cards) do
+        if sort_ids_map[pcard.sort_id] then
+            ret[pcard.sort_id] = pcard
+        end
+    end
+    return ret
 end
