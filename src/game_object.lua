@@ -1859,7 +1859,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
 
     function get_new_boss()
         -- sendWarnMessage("get_new_boss() is deprecated; Call SMODS.get_new_blind() instead.", "utils")
-        local b_types = G.GAME.round_resets.ante % G.GAME.win_ante == 0 and {Showdown = true} or {Boss = true}
+        local b_types = SMODS.is_showdown_ante() and {Showdown = true} or {Boss = true}
         local boss = SMODS.get_new_blind(b_types)
         return boss
     end
