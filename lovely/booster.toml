@@ -341,7 +341,7 @@ target = 'card.lua'
 match_indent = true
 position = 'after'
 pattern = '''if self.shop_voucher then G.GAME.current_round.voucher = nil end'''
-payload = '''SMODS.enter_state(SMODS.STATES.REDEEM_VOUCHER, nil, {from_hold = true})'''
+payload = '''SMODS.enter_state(SMODS.STATES.REDEEM_VOUCHER, nil, {from_hold = true, leave_sign = true})'''
 
 # G.FUNCS.use_card()
 # Consumables in areas other than the consumable don't count 

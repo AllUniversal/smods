@@ -413,7 +413,9 @@ SMODS.GameState {
             if G.shop and not G.shop.alignment.offset.py then
                 G.shop.alignment.offset.py = G.shop.alignment.offset.y
                 G.shop.alignment.offset.y = G.ROOM.T.y + 29
-                G.SHOP_SIGN.alignment.offset.y = -15
+                if not args.leave_sign then
+                    G.SHOP_SIGN.alignment.offset.y = -15
+                end
             end
             G.E_MANAGER:add_event(Event({
                 trigger = 'after',

@@ -1886,7 +1886,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                 local blind_config = v.boss or (table_length(b_types) == 1 and next(b_types)) or {}
                 for b_type, _ in pairs(b_types) do
                     if blind_types[b_type] then
-                        if v.in_pool or not (blind_config and (blind_config.min and blind_config.min > math.max(1, G.GAME.round_resets.ante) or (blind_config.max or G.GAME.round_resets.ante) >= G.GAME.round_resets.ante)) then
+                        if v.in_pool or not (blind_config and (blind_config.min and blind_config.min > math.max(1, G.GAME.round_resets.ante) or blind_config.max and blind_config.max <= G.GAME.round_resets.ante)) then
                             eligible_bosses[k] = true
                             break
                         end
