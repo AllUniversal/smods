@@ -1942,6 +1942,17 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         return all
     end
 
+    SMODS.Joker:take_ownership("j_matador", {
+        check_for_unlock = function (self, args)
+            return G.GAME.current_round.hands_played == 1 and G.GAME.current_round.discards_left == G.GAME.round_resets.discards and G.GAME.blind:is_type("Boss")
+        end
+    })
+
+    SMODS.Joker:take_ownership("j_hanging_chad", {
+        check_for_unlock = function (self, args)
+            return G.GAME.last_hand_played == self.unlock_condition.extra and G.GAME.blind:is_type("Boss")
+        end
+    })
     SMODS.Blind:take_ownership('eye', {
         set_blind = function(self, reset, silent)
             if not reset then
