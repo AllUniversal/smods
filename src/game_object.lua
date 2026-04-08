@@ -74,7 +74,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         local atlas_cfg = obj.prefix_config.atlas
         if atlas_cfg ~= false then
             if type(atlas_cfg) ~= 'table' then atlas_cfg = {} end
-            for _, v in ipairs({ 'atlas', 'hc_atlas', 'lc_atlas', 'hc_ui_atlas', 'lc_ui_atlas', 'sticker_atlas' }) do
+            for _, v in ipairs({ 'atlas', 'hc_atlas', 'lc_atlas', 'hc_ui_atlas', 'lc_ui_atlas', 'soul_atlas', 'hc_soul_atlas', 'lc_soul_atlas', 'sticker_atlas' }) do
                 if rawget(obj, v) then SMODS.modify_key(obj, mod and mod.prefix, atlas_cfg, v) end
             end
         end
@@ -1206,6 +1206,9 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
                     end
                 end
             end
+            if self.soul_atlas and not self.soul_pos then
+                self.soul_pos = { x = 0, y = 0 }
+            end
         end,
         delete = function(self)
             G.P_CENTERS[self.key] = nil
@@ -1746,7 +1749,7 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         create_card = function(self, card, i)
             local _edition = poll_edition('standard_edition'..G.GAME.round_resets.ante, 2, true)
             local _seal = SMODS.poll_seal({mod = 10})
-            return {set = (pseudorandom(pseudoseed('stdset'..G.GAME.round_resets.ante)) > 0.6) and "Enhanced" or "Base", edition = _edition, seal = _seal, area = G.pack_cards, skip_materialize = true, soulable = true, key_append = "sta"}
+            return {set = (pseudorandom(pseudoseed('stdset'..G.GAME.round_resets.ante)) > 0.6) and "Enhanced" or "Base", edition = _edition, seal = _seal, area = G.pack_cards, skip_materialize = true, soulable = true, key_append = "sta", front = false}
         end,
         loc_vars = pack_loc_vars,
     })
@@ -3372,7 +3375,8 @@ Set `prefix_config.key = false` on your object instead.]]):format(obj.key), obj.
         inject = function(self)
             self.full_path = (self.mod and self.mod.path or SMODS.path) ..
                 'assets/shaders/' .. self.path
-            local file = NFS.read(self.full_path)
+            local file = assert(NFS.read(self.full_path),
+                ('Failed to collect file data for Shader %s'):format(self.key))
             local lovely_success, lovely = pcall(require, "lovely")
             if lovely_success and lovely.apply_patches then
                 file = assert(lovely.apply_patches("=[SMODS " .. self.mod.id .. ' "' .. self.path .. '"]', file))
