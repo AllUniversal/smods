@@ -413,7 +413,7 @@ SMODS.GameState {
             if G.shop and not G.shop.alignment.offset.py then
                 G.shop.alignment.offset.py = G.shop.alignment.offset.y
                 G.shop.alignment.offset.y = G.ROOM.T.y + 29
-                if not args.leave_sign then
+                if not args.leave_shop_sign then
                     G.SHOP_SIGN.alignment.offset.y = -15
                 end
             end
@@ -630,7 +630,7 @@ SMODS.GameState {
     on_exit = function (self, args)
         G.GAME.facing_blind = nil
         if args.from_hold or args.no_defeat then
-            if G.HUD_blind then
+            if G.HUD_blind and not args.leave_HUD_blind then
                 G.HUD_blind.alignment.offset.py = G.HUD_blind.alignment.offset.y
                 G.HUD_blind.alignment.offset.y = -10
             end
