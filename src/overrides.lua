@@ -1859,10 +1859,10 @@ function Card:set_sprites(_center, _front)
             end
         end
 
-        if _center.soul_pos then
+        if _center.soul_pos or _center[G.SETTINGS.colourblind_option and 'hc_soul_atlas' or 'lc_soul_atlas'] or _center.soul_atlas then
 			if self.children.floating_sprite then self.children.floating_sprite:remove() end
-			local atlas_key = _center[G.SETTINGS.colourblind_option and 'hc_atlas' or 'lc_atlas'] or _center.atlas or _center.set
-            self.children.floating_sprite = SMODS.create_sprite(self.T.x, self.T.y, self.T.w, self.T.h, atlas_key, self.config.center.soul_pos)
+            local atlas_key = _center[G.SETTINGS.colourblind_option and 'hc_soul_atlas' or 'lc_soul_atlas'] or _center.soul_atlas or _center[G.SETTINGS.colourblind_option and 'hc_atlas' or 'lc_atlas'] or _center.atlas or _center.set
+            self.children.floating_sprite = SMODS.create_sprite(self.T.x, self.T.y, self.T.w, self.T.h, atlas_key, _center.soul_pos or { x = 0, y = 0 })
             self.children.floating_sprite.role.draw_major = self
             self.children.floating_sprite.states.hover.can = false
             self.children.floating_sprite.states.click.can = false
@@ -2223,6 +2223,14 @@ end
 -- _options = list of keys of editions to include in the poll
 -- OR list of tables { name = key, weight = number }
 function poll_edition(_key, _mod, _no_neg, _guaranteed, _options)
+	if not _options and (_key == "wheel_of_fortune" or _key == "aura") then -- set base game edition polling
+		_options = { 'e_negative', 'e_polychrome', 'e_holo', 'e_foil' }
+	end
+
+	-- Use SMODS object weight system when enabled
+	if SMODS.optional_features.object_weights then return SMODS.poll_object({type = 'Edition', seed = _key, guaranteed = _guaranteed, pool = _options, no_negative = _no_neg, mod = _mod}) end
+
+	
 	local _modifier = 1
 	local edition_poll = pseudorandom(pseudoseed(_key or 'edition_generic')) -- Generate the poll value
 	local available_editions = {}                                          -- Table containing a list of editions and their weights
@@ -2438,6 +2446,20 @@ function get_pack(_key, _type)
         G.GAME.first_shop_buffoon = true
         return G.P_CENTERS['p_buffoon_normal_'..(math.random(1, 2))]
     end
+
+	-- Use SMODS object weight system when enabled
+	if SMODS.optional_features.object_weights then
+		return G.P_CENTERS[SMODS.poll_object({type = 'Booster',
+			filter = _type and function(pool)
+				local out = {}
+				for _, v in ipairs(pool) do 
+					if G.P_CENTERS[v.key] and G.P_CENTERS[v.key].kind == _type then
+						out[#out + 1] = v
+					end
+				end
+				return out
+			end})]
+	end
     local cume, it, center = 0, 0, nil
 	local temp_in_pool = {}
     for k, v in ipairs(G.P_CENTER_POOLS['Booster']) do
@@ -2675,6 +2697,7 @@ function Card:set_ability(center, initial, delay_sprites)
 	if not initial and (G.STATE ~= G.STATES.SMODS_BOOSTER_OPENED and G.STATE ~= G.STATES.SHOP and not G.SETTINGS.paused or G.TAROT_INTERRUPT) then
 		SMODS.calculate_context({setting_ability = true, old = old_center.key, new = self.config.center_key, other_card = self, unchanged = old_center.key == self.config.center.key})
 	end
+	self.front_hidden = self:should_hide_front()
 end
 
 local add_tag_ref = add_tag
