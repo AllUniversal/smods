@@ -30,15 +30,14 @@ StateSprite = AnimatedSprite:extend()
 }
 ]]
 -- To change state, call StateSprite:set_state(state_name)
-function StateSprite:init(X, Y, W, H, new_sprite_atlas, states_offset, states, start_state)
+function StateSprite:init(X, Y, W, H, new_sprite_atlas, args)
     AnimatedSprite.init(self, X, Y, W, H, new_sprite_atlas, {x=0, y=0})
 
-    self.states_offset = states_offset and {x = states_offset.x or 0, y = states_offset.y or 0} or {x = 0, y = 0}
-
-    if states then
-        self:load_states(states)
-        self:set_state(start_state)
-        self.state_name = start_state
+    if args and next(args.states) then
+        self.sprite_args = args
+        self.states_offset = args.states_offset and {x = args.states_offset.x or 0, y = args.states_offset.y or 0} or {x = 0, y = 0}
+        self:load_states(args.states)
+        self:set_state(args.default_state or next(args.states))
     end
 
     self.flipped_h = false
@@ -96,14 +95,14 @@ function StateSprite:animate()
     elseif self.state.frame_order == "random" then
         new_frame = math.random(0, self.current_animation.frames - 1)
     end
-    local _x = new_frame % self.atlas.columns
-    local _y = math.floor(new_frame / self.atlas.columns)
+    local _x = self.animation.w * (new_frame % self.atlas.columns)
+    local _y = self.animation.h * math.floor(new_frame / self.atlas.columns)
     if new_frame ~= self.current_animation.current then
         self.current_animation.current = new_frame
         -- self.frame_offset = math.floor(self.animation.w*(self.current_animation.current))
         self.sprite:setViewport(
             _x,
-            self.animation.h*self.animation.y + _y, -- Equivalent to;   self.state.start_pos.y + _y   (I think at least)
+            _y,
             self.animation.w,
             self.animation.h)
     end
@@ -168,3 +167,32 @@ function Card:set_sprite_state(new_state)
         sendWarnMessage("Card:card_set_sprite_state() called on card with no StateSprite", "utils")
     end
 end
+
+
+SMODS.Atlas {
+    key = "test",
+    path = "",
+    px = 71,
+    py = 95,
+    atlas_table = "STATE_ATLAS"
+}
+
+
+SMODS.Joker {
+    key = "test",
+    atlas = "test",
+    pos = {0, 0},
+    sprite_args = {
+        states = {
+            red = {
+                start_pos = { x = 0, y = 0},
+                frames = 2
+            },
+            blue = {
+                start_pos = { x = 2, y = 0},
+                frames = 2
+            }
+        },
+        default_state = "red"
+    }
+}

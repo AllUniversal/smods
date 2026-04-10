@@ -3596,13 +3596,13 @@ function SMODS.get_atlas_sprite_class(atlas_key)
     return class_map[atlas.atlas_table] or Sprite
 end
 
-function SMODS.create_sprite(X, Y, W, H, atlas, pos, ...)
+function SMODS.create_sprite(X, Y, W, H, atlas, pos, sprite_args)
     local atlas_key = (type(atlas) == "string" and atlas) or (type(atlas) == "table" and (atlas.key or atlas.name))
     atlas = SMODS.get_atlas(atlas_key)
     assert(atlas, "SMODS.create_sprite called with invalid atlas key: "..atlas_key)
     local sprite_class = SMODS.get_atlas_sprite_class(atlas_key)
     if sprite_class == StateSprite then
-        return sprite_class(X, Y, W, H, atlas, pos, ...)
+        return sprite_class(X, Y, W, H, atlas, pos, sprite_args)
     end
     return sprite_class(X, Y, W, H, atlas, pos)
 end
