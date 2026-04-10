@@ -7,7 +7,9 @@ StateSprite = AnimatedSprite:extend()
         start_pos = { x/y = [0..n-1 for n columns/rows in sprite atlas] }, 
         (frames = [amount of frames] |OR| end_pos = { [same as start_pos] }),
         frame_order = "linear" |OR| "random" |OR| {1: x, 2: y, .. n: m}
-        (optional) flipped_h/flipped_v = true 
+        (optional) flipped_h/flipped_v = true,
+        (optional) exit_to = [state],
+        (optional) frame_durations = {1: 2.0, 2:...}
     }, 
     ...
 }
@@ -17,15 +19,17 @@ StateSprite = AnimatedSprite:extend()
 {
     sleepy = {
         start_pos = {x = 0, y = 0},
-        end_pos = {x = 3} (y is set to start_pos.y)
+        end_pos = {x = 3}           (y is set to start_pos.y)
     },
     wakey = {
-        start_pos = {x = 4}, (y is set to 0)
-        frames = 4 (end_pos is set to start_pos with .x + frames)
+        start_pos = {x = 4},        (y is set to 0)
+        frames = 4,                 (end_pos is set to start_pos with .x + frames)
+        exit_to = "lookey",         (after one iteration, sets state to this value)
     },
     lookey = {
         flipped_h = true, (start_pos is set to {x = 0, y = 0}, end_pos is set to start_pos => this state is a single frame "animation" at x = 0, y = 0, and flipped horizontally and vertically)
-        flipped_v = true
+        flipped_v = true,
+        frame_durations = {[1] = 3.0} (the first frame lasts three times longer)
     }
 }
 ]]
@@ -91,24 +95,29 @@ end
 
 function StateSprite:animate()
     if not self.state then return end
-    local new_frame
-    if type(self.state.frame_order) == "table" then
-        self.current_animation.frame_index = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
-        new_frame = self.state.frame_order[self.current_animation.frame_index] or self.current_animation.current
-    elseif self.state.frame_order == "linear" then
-        new_frame = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
-    elseif self.state.frame_order == "random" then
-        new_frame = math.random(0, self.current_animation.frames - 1)
+    if self.state.exit_to and self.current_animation.elapsed >= self.current_animation.frames then
+        self:set_state(self.state.exit_to)
     end
-    local _x = self.animation.w * ((self.states_offset.x + self.state.start_pos.x + new_frame) % self.atlas.columns)
-    local _y = self.animation.h * (self.states_offset.y + self.state.start_pos.y + math.floor(new_frame / self.atlas.columns))
-    if new_frame ~= self.current_animation.current then
-        self.current_animation.current = new_frame
+    local frame_finished = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % (self.state.frame_durations or {})[self.animation.current] or 1.0
+    if frame_finished then
+        local new_frame
+        if type(self.state.frame_order) == "table" then
+            self.current_animation.frame_index = (self.current_animation.frame_index + 1) % self.current_animation.frames
+            new_frame = self.state.frame_order[self.current_animation.frame_index] or self.current_animation.current
+        elseif self.state.frame_order == "random" then
+            new_frame = math.random(0, self.current_animation.frames - 1)
+        end
+        local _x = self.animation.w * ((self.states_offset.x + self.state.start_pos.x + new_frame) % self.atlas.columns)
+        local _y = self.animation.h * (self.states_offset.y + self.state.start_pos.y + math.floor(new_frame / self.atlas.columns))
+        self.current_animation.current = new_frame or ((self.current_animation.current + 1) % self.current_animation.frames)
+        self.current_animation.elapsed = self.current_animation.elapsed + 1
         self.sprite:setViewport(
             _x,
             _y,
             self.animation.w,
-            self.animation.h)
+            self.animation.h
+        )
+        self.offset_seconds = G.TIMERS.REAL
     end
     if self.float then 
         self.T.r = 0.02*math.sin(2*G.TIMERS.REAL+self.T.x)
@@ -131,7 +140,9 @@ function StateSprite:set_sprite_pos(sprite_pos)
         current = 0,
         frames = self.animation.frames,
         w = self.animation.w,
-        h = self.animation.h}
+        h = self.animation.h,
+        elapsed = 0,
+    }
 
     self.image_dims = self.image_dims or {}
     self.image_dims[1], self.image_dims[2] = self.atlas.image:getDimensions()
