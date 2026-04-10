@@ -1076,6 +1076,17 @@ function SMODS.shatters(card)
     end
 end
 
+function SMODS.get_ability_reset_keys(card)
+    local reset_keys = {'name', 'effect', 'set', 'extra', 'played_this_ante', 'perma_debuff'}
+    for _, mod in ipairs(SMODS.mod_list) do
+        if mod.set_ability_reset_keys then
+            local keys = mod.set_ability_reset_keys()
+            for _, v in pairs(keys) do table.insert(reset_keys, v) end
+        end
+    end
+    return reset_keys
+end
+
 function SMODS.calculate_quantum_enhancements(card, effects, context)
     if not SMODS.optional_features.quantum_enhancements then return end
     if context.extra_enhancement or context.check_enhancement or SMODS.extra_enhancement_calc_in_progress then return end
@@ -1096,8 +1107,9 @@ function SMODS.calculate_quantum_enhancements(card, effects, context)
         end
     end
     table.sort(extra_enhancements_list, function(a, b) return G.P_CENTERS[a].order < G.P_CENTERS[b].order end)
+
     for _, k in ipairs(extra_enhancements_list) do
-        card:set_ability(G.P_CENTERS[k], nil, 'quantum')
+        card:quantum_set_ability(G.P_CENTERS[k])
         card.ability.extra_enhancement = k
         local eval = eval_card(card, context)
         table.insert(effects, eval)
@@ -2559,7 +2571,8 @@ function SMODS.signed(val)
 end
 
 function SMODS.signed_dollars(val)
-    return val and (val > 0 and '$'..val or '-$'..-val) or '0'
+    local sign = (val or 0) < 0 and '-' or ''
+    return val and sign..'$'..math.abs(val) or '0'
 end
 
 function SMODS.multiplicative_stacking(base, perma)
@@ -3557,6 +3570,7 @@ function CardArea:handle_card_limit()
             self.config.card_limits.extra_slots_used = self:count_property('extra_slots_used')
         end
         self.config.card_count = #self.cards + self.config.card_limits.extra_slots_used
+        if self == G.hand then check_for_unlock({type = 'min_hand_size'}) end
 
         if G.hand and self == G.hand and (self.config.card_count or 0) + (SMODS.cards_to_draw or 0) < (self.config.card_limits.total_slots or 0) then
             if G.STATE == G.STATES.DRAW_TO_HAND and not SMODS.blind_modifies_draw(G.GAME.blind.config.blind.key) and not SMODS.draw_queued then
@@ -3785,7 +3799,7 @@ end
 
 -- Used for SMODS.ScreenShader, just to save lines re-creating canvases when relevant
 function SMODS.create_canvas()
-    local w, h = love.graphics.getPixelWidth(), love.graphics.getPixelHeight()
+    local w, h = G.CANVAS:getDimensions()
     local canvas = love.graphics.newCanvas(w, h, { type = '2d', readable = true })
     canvas:setFilter('linear', 'linear')
     return canvas
@@ -3859,8 +3873,15 @@ function SMODS.get_badge_text_colour(key)
 end
 
 
-function SMODS.resolve_ui_shaders(shader, send)
-    local shaders = {}
+function SMODS.resolve_ui_shaders(node, shader, send)
+    node.resolved_ui_shaders = node.resolved_ui_shaders or {}
+    local shaders = node.resolved_ui_shaders
+    EMPTY(shaders)
+
+    if not shader then
+        shaders[#shaders+1] = false
+        return shaders
+    end
     -- simple single shader
     if type(shader) == "string" then
         shaders[#shaders+1] = { shader = shader, send = send }
@@ -3883,24 +3904,20 @@ function SMODS.resolve_ui_shaders(shader, send)
         end
     end
     if #shaders == 0 then
-        return { { no_shader = true } }
+        shaders[#shaders+1] = false
+        return shaders
     end
     return shaders
 end
 function SMODS.set_ui_element_shader(element, input_args)
     input_args = input_args or {}
-    local can_apply = input_args.can_apply
     local shader, send = input_args.shader, input_args.send
     local default_send_func = input_args.default_send_func or function() end
     local extra = input_args.extra or {}
 
-    local args = {
-        G.TIMERS.REAL/28,
-        G.TIMERS.REAL
-    }
 	local shadered = true
     
-    if not can_apply or not shader or shader == "none" or shader == "dissolve" then
+    if not shader or shader == "none" or shader == "dissolve" then
         shadered = false
 	elseif send then
 		for _, v in ipairs(send) do
@@ -3914,7 +3931,10 @@ function SMODS.set_ui_element_shader(element, input_args)
 	else
 		local key = SMODS.Shaders[shader].original_key
 		
-		G.SHADERS[shader]:send(key, args)
+		G.SHADERS[shader]:send(key, {
+            G.TIMERS.REAL/28,
+            G.TIMERS.REAL
+        })
         default_send_func(element, shader, unpack(extra))
 	end
 
@@ -3940,8 +3960,8 @@ function SMODS.set_ui_element_shader(element, input_args)
 end
 
 function DynaText:set_letter_shader(shader, send, shadow, letter)
+    if not shader and not self.shadered then return end
     SMODS.set_ui_element_shader(self, {
-        can_apply = self.states.visible and letter,
         shader = shader,
         send = send,
         extra = { shadow, letter },
@@ -3963,8 +3983,8 @@ function DynaText:set_letter_shader(shader, send, shadow, letter)
     })
 end
 function UIElement:set_element_shader(shader, send, shadow)
+    if not shader and not self.shadered then return end
     SMODS.set_ui_element_shader(self, {
-        can_apply = self.states.visible,
         shader = shader,
         send = send,
         extra = { shadow },
@@ -3978,8 +3998,8 @@ function UIElement:set_element_shader(shader, send, shadow)
     })
 end
 function UIElement:set_text_shader(shader, send, shadow)
+    if not shader and not self.shadered then return end
     SMODS.set_ui_element_shader(self, {
-        can_apply = self.states.visible,
         shader = shader,
         send = send,
         extra = { shadow },
@@ -4044,7 +4064,7 @@ SMODS.mod_blind_size = function(blind_size_mod)
     local blind_size_cal = blind_size_mod.set or G.GAME.blind.chips
     local old = G.GAME.blind.chips
     G.BLIND_SIZE_DISPLAY_QUEUE = G.BLIND_SIZE_DISPLAY_QUEUE or {}
-    -- TARGET: higher priority score operation
+    -- TARGET: higher priority blind_size operation
     if blind_size_mod.mult then
         local absoluted = math.abs(blind_size_mod.mult)
         blind_size_cal = blind_size_cal * blind_size_mod.mult
