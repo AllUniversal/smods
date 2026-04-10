@@ -98,7 +98,7 @@ function StateSprite:animate()
     if self.state.exit_to and self.current_animation.elapsed >= self.current_animation.frames then
         self:set_state(self.state.exit_to)
     end
-    local frame_finished = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % (self.state.frame_durations or {})[self.animation.current] or 1.0
+    local frame_finished = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % (self.state.frame_durations or {})[self.current_animation.current] or 1.0
     if frame_finished then
         local new_frame
         if type(self.state.frame_order) == "table" then
@@ -107,10 +107,10 @@ function StateSprite:animate()
         elseif self.state.frame_order == "random" then
             new_frame = math.random(0, self.current_animation.frames - 1)
         end
-        local _x = self.animation.w * ((self.states_offset.x + self.state.start_pos.x + new_frame) % self.atlas.columns)
-        local _y = self.animation.h * (self.states_offset.y + self.state.start_pos.y + math.floor(new_frame / self.atlas.columns))
         self.current_animation.current = new_frame or ((self.current_animation.current + 1) % self.current_animation.frames)
         self.current_animation.elapsed = self.current_animation.elapsed + 1
+        local _x = self.animation.w * ((self.states_offset.x + self.state.start_pos.x + self.current_animation.current) % self.atlas.columns)
+        local _y = self.animation.h * (self.states_offset.y + self.state.start_pos.y + math.floor(self.current_animation.current / self.atlas.columns))
         self.sprite:setViewport(
             _x,
             _y,
