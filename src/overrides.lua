@@ -1798,7 +1798,7 @@ function Card:set_sprites(_center, _front)
     if _front then
         local _atlas, _pos = get_front_spriteinfo(_front)
         if self.children.front then self.children.front:remove() end
-		self.children.front = SMODS.create_sprite(self.T.x, self.T.y, self.T.w, self.T.h, _atlas, _pos, _center.sprite_args)
+		self.children.front = SMODS.create_sprite(self.T.x, self.T.y, self.T.w, self.T.h, _atlas, _pos, _center and _center.sprite_args)
 		self.children.front.states.hover = self.states.hover
 		self.children.front.states.click = self.states.click
 		self.children.front.states.drag = self.states.drag

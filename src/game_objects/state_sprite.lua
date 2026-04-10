@@ -30,10 +30,13 @@ StateSprite = AnimatedSprite:extend()
 }
 ]]
 -- To change state, call StateSprite:set_state(state_name)
-function StateSprite:init(X, Y, W, H, new_sprite_atlas, args)
+function StateSprite:init(X, Y, W, H, new_sprite_atlas, _pos, args)
     AnimatedSprite.init(self, X, Y, W, H, new_sprite_atlas, {x=0, y=0})
+    args = args or {}
 
-    if args and next(args.states) then
+    if not args.states or not next(args.states) then
+        sendWarnMessage(string.format("StateSprite initialized without states, atlas = '%s'", new_sprite_atlas.name), "utils")
+    else
         self.sprite_args = args
         self.states_offset = args.states_offset and {x = args.states_offset.x or 0, y = args.states_offset.y or 0} or {x = 0, y = 0}
         self:load_states(args.states)
@@ -50,7 +53,9 @@ end
 
 function StateSprite:set_state(state)
     local a_state = self.a_states[state]
-    if a_state and self.state ~= a_state then
+    if not a_state then
+        sendWarnMessage(string.format("StateSprite:set_state() called with invalid state '%s'", state), "utils")
+    elseif self.state ~= a_state then
         self.state = a_state
         self:set_sprite_pos({x = self.state.start_pos.x + self.states_offset.x, y = self.state.start_pos.y + self.states_offset.y})
         self.flipped_h = self.state.flipped_h
@@ -62,9 +67,9 @@ end
 
 function StateSprite:load_states(states)
     self.a_states = {}
-    for key, state in ipairs(states) do
+    for key, state in pairs(states) do
         state.start_pos = state.start_pos and {x = state.start_pos.x or 0, y = state.start_pos.y or 0} or {x = 0, y = 0}
-        state.end_pos = state.end_pos and {x = state.end_pos.x or state.start_pos.x + (state.frames or 0), y = state.end_pos.y or state.start_pos.y} or state.start_pos
+        state.frames = state.frames or ((state.end_pos or state.start_pos).x - state.start_pos.x + ((state.end_pos.y or state.start_pos).y - state.start_pos.y) * self.atlas.columns + 1)
         if type(state.frame_order) == "string" then
             local keymap = {
                 linear=true,
@@ -92,15 +97,14 @@ function StateSprite:animate()
         self.current_animation.frame_index = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
         new_frame = self.state.frame_order[self.current_animation.frame_index] or self.current_animation.current
     elseif self.state.frame_order == "linear" then
-        new_frame = self.state.start_pos.x + math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
+        new_frame = math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds)) % self.current_animation.frames
     elseif self.state.frame_order == "random" then
         new_frame = math.random(0, self.current_animation.frames - 1)
     end
-    local _x = self.animation.w * (new_frame % self.atlas.columns)
-    local _y = self.animation.h * math.floor(new_frame / self.atlas.columns)
+    local _x = self.animation.w * ((self.states_offset.x + self.state.start_pos.x + new_frame) % self.atlas.columns)
+    local _y = self.animation.h * (self.states_offset.y + self.state.start_pos.y + math.floor(new_frame / self.atlas.columns))
     if new_frame ~= self.current_animation.current then
         self.current_animation.current = new_frame
-        -- self.frame_offset = math.floor(self.animation.w*(self.current_animation.current))
         self.sprite:setViewport(
             _x,
             _y,
@@ -118,7 +122,7 @@ function StateSprite:set_sprite_pos(sprite_pos)
     self.animation = {
         x = sprite_pos and sprite_pos.x or 0,
         y = sprite_pos and sprite_pos.y or 0,
-        frames = self.state and (self.state.end_pos.x - self.state.start_pos.x) or 1, current = 0,
+        frames = self.state and self.state.frames or 1, current = 0,
         w = self.scale.x, h = self.scale.y
     }
 
@@ -134,7 +138,7 @@ function StateSprite:set_sprite_pos(sprite_pos)
     self.image_dims[1], self.image_dims[2] = self.atlas.image:getDimensions()
 
     self.sprite = love.graphics.newQuad(
-        0,
+        self.animation.w*self.animation.x,
         self.animation.h*self.animation.y,
         self.animation.w,
         self.animation.h,
@@ -172,7 +176,7 @@ end
 
 SMODS.Atlas {
     key = "test",
-    path = "",
+    path = "test.png",
     px = 71,
     py = 95,
     atlas_table = "STATE_ATLAS"
@@ -182,7 +186,7 @@ SMODS.Atlas {
 SMODS.Joker {
     key = "test",
     atlas = "test",
-    pos = {0, 0},
+    pos = {x=0, y=0},
     sprite_args = {
         states = {
             red = {
@@ -195,5 +199,10 @@ SMODS.Joker {
             }
         },
         default_state = "red"
-    }
+    },
+    calculate = function (self, card, context)
+        if context.bababooey then
+            card.children.center:set_state(context.state)
+        end
+    end
 }
