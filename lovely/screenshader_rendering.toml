@@ -49,6 +49,7 @@ end
 love.graphics.setCanvas()
 love.graphics.setShader()
 if last_canvas then
+    love.graphics.clear{0,0,0,1}
     love.graphics.draw(last_canvas, 0, 0)
     -- Draw everything we just did to the main canvas (what the player actually sees)
 end
