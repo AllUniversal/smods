@@ -84,6 +84,7 @@ function StateSprite:load_states(states)
     end
 end
 
+-- Todo : check this bs
 function StateSprite:animate()
     if not self.state then return end
     local new_frame
