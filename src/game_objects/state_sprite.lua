@@ -89,7 +89,6 @@ function StateSprite:load_states(states)
     end
 end
 
--- Todo : check this bs
 function StateSprite:animate()
     if not self.state then return end
     local new_frame
@@ -172,37 +171,3 @@ function Card:set_sprite_state(new_state)
         sendWarnMessage("Card:card_set_sprite_state() called on card with no StateSprite", "utils")
     end
 end
-
-
-SMODS.Atlas {
-    key = "test",
-    path = "test.png",
-    px = 71,
-    py = 95,
-    atlas_table = "STATE_ATLAS"
-}
-
-
-SMODS.Joker {
-    key = "test",
-    atlas = "test",
-    pos = {x=0, y=0},
-    sprite_args = {
-        states = {
-            red = {
-                start_pos = { x = 0, y = 0},
-                frames = 2
-            },
-            blue = {
-                start_pos = { x = 2, y = 0},
-                frames = 2
-            }
-        },
-        default_state = "red"
-    },
-    calculate = function (self, card, context)
-        if context.bababooey then
-            card.children.center:set_state(context.state)
-        end
-    end
-}
