@@ -5,7 +5,7 @@
 function SMODS.poll_object(args)
     assert(args, "SMODS.poll_object called with no args."..SMODS.log_crash_info(debug.getinfo(2)))
     assert((args.type or (args.types and type(args.types) == 'table') or (args.attributes and type(args.attributes) == 'table') or (args.pool and type(args.pool) == 'table')), "SMODS.poll_object called without a pool source." .. SMODS.log_crash_info(debug.getinfo(2)))
-
+    if args.type == 'Base' then return 'INTERNAL_PLAYING_CARD' end
     -- Prepare pool
     local pool = args.pool or {}
     local types = args.attributes or args.types or {args.type}
@@ -364,6 +364,7 @@ function SMODS.create_shop_card(area)
         area = area
     }
     card_args.key = SMODS.poll_object({type = card_args.type, append = 'sho'})
+    if card_args.key == 'INTERNAL_PLAYING_CARD' then card_args.key = nil; card_args.set = 'Base' end
 
     local flags = SMODS.calculate_context({create_shop_card = true, set = card_args.type, key = card_args.key})
 
