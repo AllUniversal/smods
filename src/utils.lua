@@ -428,9 +428,18 @@ function SMODS.create_card(t)
     -- or should that be left to the person calling SMODS.create_card to use it correctly?
     if t.edition then _card:set_edition(t.edition, nil, t.silent.edition) end
     if t.seal then _card:set_seal(t.seal, t.silent.seal); _card.ability.delay_seal = false end
-    if t.stickers then
-        for i, v in ipairs(t.stickers) do
-            _card:add_sticker(v, t.force_stickers)
+    if t.stickers or type(t.force_stickers) == "table" then
+        local applied_stickers = {}
+        if type(t.force_stickers) == "table" then
+            for i, v in ipairs(t.force_stickers) do
+                _card:add_sticker(v, true)
+                applied_stickers[v] = true
+            end
+        end
+        for i, v in ipairs(t.stickers or {}) do
+            if not applied_stickers[v] then
+                _card:add_sticker(v, t.force_stickers == true)
+            end
         end
     end
 
