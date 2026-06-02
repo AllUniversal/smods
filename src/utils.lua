@@ -2801,7 +2801,42 @@ function SMODS.info_queue_desc_from_rows(desc_nodes, empty, maxw)
   }}
 end
 
-function SMODS.destroy_cards(cards, bypass_eternal, immediate, skip_anim, colours)
+function SMODS.is_playing_card(card) 
+    if not type(card) == "table" then return false end
+	local set = (card.ability or {}).set or ((card.config or {}).center or {}).set
+	return card.playing_card or set == "Default" or set == "Enhanced"
+end
+
+function SMODS.pinch_and_remove(card)
+    if not SMODS.is_playing_card(card) then
+        local flags = SMODS.calculate_context({joker_type_destroyed = true, card = card})
+        if flags.no_destroy then card.getting_sliced = nil; return false end
+    end
+    play_sound('tarot1')
+    card.T.r = -0.2
+    card:juice_up(0.3, 0.4)
+    card.states.drag.is = true
+    card.children.center.pinch.x = true
+    G.E_MANAGER:add_event(Event({
+        trigger = 'after', delay = 0.3, blockable = false,
+        func = function()
+            card:remove()
+            return true; 
+        end
+    }))
+    return true
+end
+
+function SMODS.destroy_cards(cards, args, ...)
+    local other_args = {...}
+    if type(args) ~= "table" then
+        if args then args = {bypass_eternal = true}
+        else args = {} end
+    end
+    args.immediate = args.immediate or other_args[1]
+    args.pinch_anim = args.pinch_anim or other_args[2]
+    args.colours = args.colours or other_args[3]
+
     if not cards[1] then
         if Object.is(cards, Card) then
             cards = {cards}
@@ -2811,9 +2846,11 @@ function SMODS.destroy_cards(cards, bypass_eternal, immediate, skip_anim, colour
     end
     local glass_shattered = {}
     local playing_cards = {}
+    local queued_for_destruction = {}
     for _, card in ipairs(cards) do
-        if bypass_eternal or not SMODS.is_eternal(card, {destroy_cards = true}) then
+        if args.bypass_eternal or not SMODS.is_eternal(card, {destroy_cards = true}) then
             card.getting_sliced = true
+            table.insert(queued_for_destruction, card)
             if SMODS.shatters(card) then
                 card.shattered = true
                 glass_shattered[#glass_shattered + 1] = card
@@ -2823,7 +2860,6 @@ function SMODS.destroy_cards(cards, bypass_eternal, immediate, skip_anim, colour
             if card.base.name then
                 playing_cards[#playing_cards + 1] = card
             end
-            card.skip_destroy_animation = skip_anim
         end
     end
 
@@ -2831,26 +2867,35 @@ function SMODS.destroy_cards(cards, bypass_eternal, immediate, skip_anim, colour
 
     if next(playing_cards) then SMODS.calculate_context({scoring_hand = cards, remove_playing_cards = true, removed = playing_cards}) end
 
-    for i = 1, #cards do
-        if immediate or skip_anim then
-            if cards[i].shattered then
-                cards[i]:shatter()
-            elseif cards[i].destroyed then
-                cards[i]:start_dissolve(colours)
-            end
+    local destroy_func = function (card, args)
+        if not card.getting_sliced then return false end
+        if args.destroy_func then 
+            return args.destroy_func(card, args) ~= false
+        elseif args.pinch_anim then
+            return SMODS.pinch_and_remove(card)
+        elseif card.shattered then
+            return card:shatter() ~= false
+        elseif card.destroyed then
+            return card:start_dissolve(args.colours) ~= false
+        end
+        return false
+    end
+
+    for i, card in ipairs(queued_for_destruction) do
+        if args.immediate then
+            destroy_func(card, args)
         else
             G.E_MANAGER:add_event(Event({
+                trigger = args.delay and "after" or "immediate",
+                delay = args.delay,
                 func = function()
-                    if cards[i].shattered then
-                        cards[i]:shatter()
-                    elseif cards[i].destroyed then
-                        cards[i]:start_dissolve(colours, i == #cards)
-                    end
+                    destroy_func(card, args)
                     return true
                 end
             }))
         end
     end
+    return queued_for_destruction
 end
 
 -- Hand Limit API
@@ -3000,7 +3045,8 @@ G.FUNCS.update_blind_debuff_text = function(e)
 end
 
 function Card:should_hide_front()
-  return self.ability.effect == 'Stone Card' or self.config.center.replace_base_card
+    local center = self.delay_center or self.config.center
+    return center.effect == "Stone Card" or center.replace_base_card
 end
 
 function SMODS.is_eternal(card, trigger)
@@ -4140,8 +4186,7 @@ end
 
 function SMODS.add_to_deck(card, args)
     args = args or {}
-    local is_playing_card = card.playing_card or args.playing_card or
-        args.set == "Base" or args.set == "Enhanced" or card.ability.set == "Default" or card.ability.set == "Enhanced"
+    local is_playing_card = SMODS.is_playing_card(card) or args.playing_card or args.set == "Base" or args.set == "Enhanced"
     if is_playing_card then
         if not card.playing_card and not args.playing_card then
             G.playing_card = (G.playing_card and G.playing_card + 1) or 1
