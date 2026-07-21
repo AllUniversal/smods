@@ -1167,7 +1167,7 @@ function modsCollectionTally(pool, set, ignore_discovered)
     local obj_tally = {tally = 0, of = 0}
 
     for _, v in pairs(pool) do
-        if v.mod and G.ACTIVE_MOD_UI.id == v.mod.id and (not v.no_collection or (type(v.no_collection) == 'function' and not v:no_collection())) then
+        if v.mod and G.ACTIVE_MOD_UI.id == v.mod.id and (not SMODS.hide_from_collection(v)) then
             if set then
                 if v.set and v.set == set then
                     obj_tally.of = obj_tally.of+1
@@ -1922,6 +1922,12 @@ function create_UIBox_mods_button()
                                                 ref_table = SMODS.config,
                                                 ref_value = 'vanilla_run_select',
                                                 info = {localize('b_vanilla_run_select_info')}
+                                            },
+                                            create_toggle {
+                                                label = localize('b_run_select_reduce'),
+                                                ref_table = SMODS.config,
+                                                ref_value = 'run_select_performance',
+                                                info = {localize('b_run_select_reduce_info')}
                                             },
                                         }
                                     }
