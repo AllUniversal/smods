@@ -3903,7 +3903,7 @@ end
 
 
 function SMODS.get_atlas(atlas_key)
-    return G.ASSET_ATLAS[atlas_key] or G.ANIMATION_ATLAS[atlas_key]
+    return G.ASSET_ATLAS[atlas_key] or G.ANIMATION_ATLAS[atlas_key] -- atlas.atlas_table = STATE_ATLAS -> also stored in G.ANIMATION_ATLAS
 end
 
 function SMODS.get_atlas_sprite_class(atlas_key)
@@ -3911,15 +3911,20 @@ function SMODS.get_atlas_sprite_class(atlas_key)
     local class_map = {
         ASSET_ATLAS = Sprite,
         ANIMATION_ATLAS = AnimatedSprite,
+        STATE_ATLAS = StateSprite,
     }
     return class_map[atlas.atlas_table] or Sprite
 end
 
-function SMODS.create_sprite(X, Y, W, H, atlas, pos)
+function SMODS.create_sprite(X, Y, W, H, atlas, pos, sprite_args)
     local atlas_key = (type(atlas) == "string" and atlas) or (type(atlas) == "table" and (atlas.key or atlas.name))
     atlas = SMODS.get_atlas(atlas_key)
     assert(atlas, "SMODS.create_sprite called with invalid atlas key: "..atlas_key)
-    return SMODS.get_atlas_sprite_class(atlas_key)(X, Y, W, H, atlas, pos)
+    local sprite_class = SMODS.get_atlas_sprite_class(atlas_key)
+    if sprite_class ~= Sprite then
+        return sprite_class(X, Y, W, H, atlas, pos, sprite_args)
+    end
+    return sprite_class(X, Y, W, H, atlas, pos)
 end
 
 local animate = AnimatedSprite.animate
@@ -4282,8 +4287,8 @@ function UIElement:set_element_shader(shader, send, shadow)
         extra = { shadow },
         default_send_func = function(element, shader, shadow)
             local tile_scale = G.TILESCALE*G.TILESIZE*G.CANV_SCALE
-
-            G.SHADERS[shader]:send("uie_details", {element.VT.x * tile_scale, element.VT.y * tile_scale, element.VT.w * tile_scale, element.VT.h * tile_scale})
+            
+            G.SHADERS[shader]:send("uie_details", {(element.container.T.x + element.VT.x) * tile_scale, (element.container.T.y + element.VT.y) * tile_scale, element.VT.w * tile_scale, element.VT.h * tile_scale})
             G.SHADERS[shader]:send("uie_scale", element.VT.scale)
             G.SHADERS[shader]:send("uie_rot", element.VT.r)
         end
@@ -4298,7 +4303,7 @@ function UIElement:set_text_shader(shader, send, shadow)
         default_send_func = function(element, shader, shadow)
             local tile_scale = G.TILESCALE*G.TILESIZE*G.CANV_SCALE
 
-            G.SHADERS[shader]:send("text_details", {element.VT.x * tile_scale, element.VT.y * tile_scale, element.VT.w * tile_scale, element.VT.h * tile_scale})
+            G.SHADERS[shader]:send("text_details", {(element.container.T.x + element.VT.x) * tile_scale, (element.container.T.y + element.VT.y) * tile_scale, element.VT.w * tile_scale, element.VT.h * tile_scale})
             G.SHADERS[shader]:send("text_scale", element.VT.scale)
             G.SHADERS[shader]:send("text_rot", element.VT.r)
             G.SHADERS[shader]:send("text_shadow", not not shadow)
