@@ -11,6 +11,7 @@ StateSprite = AnimatedSprite:extend()
         (optional) exit_to = [state] |OR [function(state_table, sprite), returning a state],
         (optional) frame_durations = {1: 2, 2:...},     (in Frames according to G.ANIMATION_FPS)
         (optional) default_frame_duration = 1,          (in Frames according to G.ANIMATION_FPS)
+        (optional) fps = 2,                             (in Frames per second according to G.ANIMATION_FPS, alternative to default_frame_duration)
     }, 
     ...
 }
@@ -39,6 +40,11 @@ StateSprite = AnimatedSprite:extend()
 -- To change state, call StateSprite:set_state(state_name) / Card:set_sprite_state()
 function StateSprite:init(X, Y, W, H, new_sprite_atlas, _pos, args)
     self.sprite_args = args or {}
+    if new_sprite_atlas.sprite_args then 
+		for arg_key, v in pairs(new_sprite_atlas.sprite_args) do
+			if self.sprite_args[arg_key] == nil then self.sprite_args[arg_key] = v end
+		end
+	end
     AnimatedSprite.init(self, X, Y, W, H, new_sprite_atlas, {x=0, y=0}, args)
 
     if not self.sprite_args.states or not next(self.sprite_args.states) then
@@ -104,7 +110,7 @@ function SMODS.get_new_frame(animated_sprite, frame_order)
     elseif frame_order == "random" then
         return math.random(0, cur_anim.frames-1)
     end
-    return ((animated_sprite.current_animation.current + 1) % animated_sprite.current_animation.frames)
+    return ((cur_anim.current + 1) % cur_anim.frames)
 end
 
 function StateSprite:animate()
@@ -116,11 +122,13 @@ function StateSprite:animate()
             self:set_state(self.state.exit_to)
         end
     end
-    local frame_finished = (math.floor(G.ANIMATION_FPS*(G.TIMERS.REAL - self.offset_seconds) / self.current_animation.frame_duration)) > 0
+    local frame_finished = (math.floor((G.TIMERS.REAL - self.offset_seconds) / self.current_animation.frame_duration)) > 0
     if frame_finished then
         self.current_animation.current = SMODS.get_new_frame(self, self.state.frame_order)
         self.current_animation.elapsed = self.current_animation.elapsed + 1
-        self.current_animation.frame_duration = (self.state.frame_durations or {})[self.current_animation.current+1] or self.state.default_frame_duration or 1
+        local frame_duration = (self.state.frame_durations or {})[self.current_animation.current+1] or self.state.default_frame_duration or 1
+		local fps = self.state.fps or self.atlas.fps or G.ANIMATION_FPS
+        self.current_animation.frame_duration = frame_duration / fps
         local _x = self.animation.w * ((self.states_offset.x + self.state.start_pos.x + self.current_animation.current) % self.atlas.columns)
         local _y = self.animation.h * (self.states_offset.y + self.state.start_pos.y + math.floor(self.current_animation.current / self.atlas.columns))
         self.sprite:setViewport(
@@ -146,6 +154,8 @@ function StateSprite:set_sprite_pos(sprite_pos)
         w = self.scale.x, h = self.scale.y
     }
 
+    local frame_duration = self.state and ((self.state.frame_durations or {})[1] or self.state.default_frame_duration)
+    local fps = (self.state and self.state.fps) or self.atlas.fps or G.ANIMATION_FPS
     self.current_animation = {
         current = 0,
         frames = self.animation.frames,
@@ -153,7 +163,7 @@ function StateSprite:set_sprite_pos(sprite_pos)
         h = self.animation.h,
         elapsed = 0,
         frame_index = 0,
-        frame_duration = (self.state and self.state.frame_durations or {})[1] or self.state and self.state.default_frame_duration or 1
+        frame_duration = frame_duration / fps
     }
 
     self.image_dims = self.image_dims or {}
