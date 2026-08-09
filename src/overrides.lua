@@ -2980,29 +2980,36 @@ end
 
 -- AnimatedSprite : Use obj.sprite_args and allow wrapping / overlapping frames / StateSprite args like flipped_h/v, frame_duration(s) and frame_order.
 function AnimatedSprite:init(X, Y, W, H, new_sprite_atlas, sprite_pos, args)
-	sprite_pos = sprite_pos or {x=0, y=0}
-	self.sprite_args = args or {}
-	if new_sprite_atlas.sprite_args then 
-		for arg_key, v in pairs(new_sprite_atlas.sprite_args) do
-			if self.sprite_args[arg_key] == nil then self.sprite_args[arg_key] = v end
-		end
-	end
+	self.sprite_pos = sprite_pos or {x=0, y=0}
     Sprite.init(self,X, Y, W, H, new_sprite_atlas, sprite_pos)
     self.offset = {x = 0, y = 0}
 
+	self:load_sprite_args(args)
+
     table.insert(G.ANIMATIONS, self)
     if getmetatable(self) == AnimatedSprite then 
-		self.sprite_args.start_pos = self.sprite_args.start_pos or {}
-		self.sprite_args.start_pos.x = self.sprite_args.start_pos.x or sprite_pos.x or 0
-		self.sprite_args.start_pos.y = self.sprite_args.start_pos.y or sprite_pos.y or 0
-		self.sprite_args.frames = self.sprite_args.frames or self.sprite_args.end_pos and ((self.sprite_args.end_pos.x or self.sprite_args.start_pos.x) - self.sprite_args.start_pos.x + ((self.sprite_args.end_pos.y or self.sprite_args.start_pos.y) - self.sprite_args.start_pos.y) * self.atlas.columns + 1) or self.atlas.frames or 1
-		self.flipped_h = self.sprite_args.flipped_h or false
-		self.flipped_v = self.sprite_args.flipped_v or false
         table.insert(G.I.SPRITE, self)
     end
 end
 
+function AnimatedSprite:load_sprite_args(args)
+	self.sprite_args = args or {}
+	if self.atlas.sprite_args then 
+		for arg_key, v in pairs(self.atlas.sprite_args) do
+			if self.sprite_args[arg_key] == nil then self.sprite_args[arg_key] = v end
+		end
+	end
+	self.sprite_args.start_pos = self.sprite_args.start_pos or {}
+	self.sprite_args.start_pos.x = self.sprite_args.start_pos.x or self.sprite_pos.x or 0
+	self.sprite_args.start_pos.y = self.sprite_args.start_pos.y or self.sprite_pos.y or 0
+	self.sprite_args.frames = self.sprite_args.frames or self.sprite_args.end_pos and ((self.sprite_args.end_pos.x or self.sprite_args.start_pos.x) - self.sprite_args.start_pos.x + ((self.sprite_args.end_pos.y or self.sprite_args.start_pos.y) - self.sprite_args.start_pos.y) * self.atlas.columns + 1) or self.atlas.frames or 1
+	self.flipped_h = self.sprite_args.flipped_h or false
+	self.flipped_v = self.sprite_args.flipped_v or false
+	self:set_sprite_pos(self.sprite_pos)
+end
+
 function AnimatedSprite:animate()
+	if not self.current_animation or not self.current_animation.frames then return end
     local frame_finished = (math.floor((G.TIMERS.REAL - self.offset_seconds) / self.current_animation.frame_duration)) > 0
     if frame_finished then
         self.current_animation.current = SMODS.get_new_frame(self, self.sprite_args.frame_order)
@@ -3026,11 +3033,13 @@ function AnimatedSprite:animate()
     end
 end
 
+function AnimatedSprite:rescale() end -- Functionality unclear / deprecated, self.scale_mag is not used anymore, instead love.graphics.scale is called with live values. 
+
 function AnimatedSprite:draw_self()
     if not self.states.visible then return end
 
     prep_draw(self, 1)
-    love.graphics.scale(1/self.scale_mag)
+    love.graphics.scale(1/(self.scale.x/self.VT.w), 1/(self.scale.y/self.VT.h))
     love.graphics.setColor(G.C.WHITE)
     love.graphics.draw(
         self.atlas.image, 
@@ -3044,6 +3053,7 @@ function AnimatedSprite:draw_self()
 end
 
 function AnimatedSprite:set_sprite_pos(sprite_pos)
+	if not self.sprite_args then return end
     self.animation = {
         x= sprite_pos and sprite_pos.x or 0,
         y= sprite_pos and sprite_pos.y or 0,

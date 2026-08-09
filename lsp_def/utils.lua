@@ -3,7 +3,7 @@
 --- Util Classes
 
 --- Internal class referring args passed as `context` in a SMODS object's `calculate` function.
---- Not all arguments typed here are present in all contexts, see [Calculate Function](https://github.com/Steamodded/smods/wiki/calculate_functions#contexts) for details.
+--- Not all arguments typed here are present in all contexts, see [Calculate Function](https://docs.smods.dev/API%20Documentation/Calculate-Functions#contexts) for details.
 ---@class CalcContext: table
 ---@field cardarea? CardArea|PlayAreas|table The CardArea currently being checked.
 ---@field full_hand? Card[]|table[] All played or selected cards.
@@ -710,12 +710,13 @@ function SMODS.get_multi_boxes(multi_box) end
 function SMODS.is_playing_card(card) end
 
 ---@param card Card 
+---@param args? {silent?: boolean, no_juice?: boolean} 
 ---@return boolean success
 -- Pinches and :removes() a card. (context.joker_type_destroyed is calculated, and may prevent destruction)
-function SMODS.pinch_and_remove(card) end
+function SMODS.pinch_and_remove(card, args) end
 
 ---@param cards Card|Card[]
----@param args? {bypass_eternal?: boolean, immediate?: boolean, pinch_anim?: boolean, colours?: table<integer, table>[], delay?: number, destroy_func?: fun(card: Card, args: table<>)}
+---@param args? {bypass_eternal?: boolean, immediate?: boolean, pinch_anim?: boolean, colours?: table<integer, table>[], silent?: boolean, delay?: number, destroy_func?: fun(card: Card, args: table<>)}
 ---@param ... ... Old signature arguments in the above order, up to and including colours
 ---@return Card[] destroy_queued
 --- Destroys the cards passed to the function, handling calculation events that need to happen.

@@ -1994,6 +1994,12 @@ function SMODS.update_context_flags(context, flags)
         if flags.replace_display_name then context.display_name = flags.replace_display_name end
         if flags.replace_poker_hands then context.poker_hands = flags.replace_poker_hands end
     end
+    if context.scaling_card or context.resetting_card then
+        SMODS.update_context_flags_scaling_resetting(context, flags)
+    end
+end
+
+function SMODS.update_context_flags_scaling_resetting(context, flags)
     if context.scaling_card then
         if not context.block_overrides.value and flags.override_value then
             if type(flags.override_value) == 'table' then
@@ -2015,13 +2021,6 @@ function SMODS.update_context_flags(context, flags)
         if not context.block_overrides.message and flags.override_message then
             context.scaling_message = SMODS.merge_defaults(flags.override_message, context.scaling_message)
         end
-        if flags.post then
-            flags.post.source = flags.scored_card
-            flags.post_effects = flags.post_effects or {}
-            table.insert(flags.post_effects, flags.post)
-        end
-        ---@diagnostic disable-next-line: unbalanced-assignments
-        flags.override_value, flags.override_scalar, flags.override_scalar_value, flags.override_message, flags.post = nil
     end
     if context.resetting_card then
         local override_value = flags.override_value or flags.override_reset_value
@@ -2036,15 +2035,15 @@ function SMODS.update_context_flags(context, flags)
         if not context.block_overrides.message and flags.override_message then
             context.reset_message = SMODS.merge_defaults(flags.override_message, context.reset_message)
         end
-        if flags.post then
-            flags.post.source = flags.scored_card
-            flags.post_effects = flags.post_effects or {}
-            table.insert(flags.post_effects, flags.post)
-        end
-        ---@diagnostic disable-next-line: unbalanced-assignments
-        flags.override_value, flags.override_reset_value, flags.override_message, flags.post = nil
     end
+    if flags.post then
+        flags.post.source = flags.scored_card
+        flags.post_effects = flags.post_effects or {}
+        table.insert(flags.post_effects, flags.post)
+    end
+    flags.override_value, flags.override_scalar, flags.override_scalar_value, flags.override_message, flags.post = nil, nil, nil, nil, nil
 end
+
 
 -- Used to avoid looping getter context calls. Example;
 -- Joker A: Doubles lucky card probabilities
@@ -2982,14 +2981,15 @@ function SMODS.is_playing_card(card)
 	return card.playing_card or set == "Default" or set == "Enhanced"
 end
 
-function SMODS.pinch_and_remove(card)
+function SMODS.pinch_and_remove(card, args)
+    args = args or {}
     if not SMODS.is_playing_card(card) then
         local flags = SMODS.calculate_context({joker_type_destroyed = true, card = card})
         if flags.no_destroy then card.getting_sliced = nil; return false end
     end
-    play_sound('tarot1')
+    if not args.silent then play_sound('tarot1') end
     card.T.r = -0.2
-    card:juice_up(0.3, 0.4)
+    if not args.no_juice then card:juice_up(0.3, 0.4) end
     card.states.drag.is = true
     card.children.center.pinch.x = true
     G.E_MANAGER:add_event(Event({
@@ -3047,11 +3047,11 @@ function SMODS.destroy_cards(cards, args, ...)
         if args.destroy_func then 
             return args.destroy_func(card, args) ~= false
         elseif args.pinch_anim then
-            return SMODS.pinch_and_remove(card)
+            return SMODS.pinch_and_remove(card, args)
         elseif card.shattered then
-            return card:shatter() ~= false
+            return card:shatter(args) ~= false
         elseif card.destroyed then
-            return card:start_dissolve(args.colours) ~= false
+            return card:start_dissolve(args.colours, args.silent, args.dissolve_time_fac, args.no_juice) ~= false
         end
         return false
     end
@@ -3959,12 +3959,6 @@ function SMODS.create_sprite(X, Y, W, H, atlas, pos, sprite_args)
     return sprite_class(X, Y, W, H, atlas, pos)
 end
 
-local animate = AnimatedSprite.animate
-function AnimatedSprite:animate()
-    if not self.current_animation.frames then return end
-    animate(self)
-end
-
 function SMODS.is_active_blind(key, ignore_disabled)
     return G.GAME and G.GAME.blind and G.GAME.facing_blind and (G.GAME.blind.name == key or G.GAME.blind.config.blind.key == key) and (not G.GAME.blind.disabled or ignore_disabled)
 end
@@ -4501,6 +4495,15 @@ function SMODS.add_to_deck(card, args)
     local area = args.area or G.jokers
     area:emplace(card)
     return card
+end
+
+-- get_index() but with an early return
+function SMODS.get_index(t, value)
+	if not type(t) == "table" then return end
+	for k, v in pairs(t) do
+		if v == value then return k end
+	end
+	return nil
 end
 
 -- Hook for the below Util function
